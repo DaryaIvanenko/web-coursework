@@ -1,107 +1,105 @@
 const express = require('express');
 const app = express();
-const PORT = process.env.PORT || 3000;
+const { Report } = require('./models');
 
 app.use(express.json());
 
-let reports = [
-  {
-    id: 1,
-    title: 'Заказы с высоким чеком',
-    entityName: 'orders',
-    selectedFields: ['id', 'user_id', 'total_amount', 'created_at'],
-    filters: [{ field: 'total_amount', operator: 'GREATER_THAN', value: 10000 }],
-    createdAt: '2026-03-01T10:00:00Z'
-  },
-  {
-    id: 2,
-    title: 'Заканчивающиеся товары на складе',
-    entityName: 'products',
-    selectedFields: ['id', 'name', 'price', 'stock_quantity'],
-    filters: [{ field: 'stock_quantity', operator: 'LESS_THAN', value: 5 }],
-    createdAt: '2026-03-05T14:30:00Z'
-  }
-];
+// 1. GET /reports (получение всех отчётов или с фильтрацией по query)
+app.get('/reports', async (req, res) => {
+  try {
+    const { entityName } = req.query;
+    const whereClause = entityName ? { entityName } : {};
 
-app.get('/reports', (req, res) => {
-  res.json(reports);
+    const reports = await Report.findAll({ where: whereClause });
+    res.json(reports);
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка при получении отчётов' });
+  }
 });
 
-app.get('/reports/:id', (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const report = reports.find(r => r.id === id);
-
-  if (!report) {
-    return res.status(404).json({ error: `Отчёт с ID ${id} не найден` });
+// 2. GET /reports/:id (поиск отчёта по ID)
+app.get('/reports/:id', async (req, res) => {
+  try {
+    const report = await Report.findByPk(req.params.id);
+    if (!report) {
+      return res.status(404).json({ error: 'Отчёт не найден' });
+    }
+    res.json(report);
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка сервера' });
   }
-
-  res.json(report);
 });
 
-app.post('/reports', (req, res) => {
-  const { title, entityName, selectedFields, filters } = req.body;
+// 3. POST /reports (создание отчёта)
+app.post('/reports', async (req, res) => {
+  try {
+    const { title, entityName, selectedFields, filters } = req.body;
 
-  if (!title || !entityName || !Array.isArray(selectedFields)) {
-    return res.status(400).json({
-      error: 'Неверные данные. Поля title, entityName и массив selectedFields обязательны.'
+    if (!title || !entityName || !Array.isArray(selectedFields)) {
+      return res.status(400).json({ error: 'Некорректные данные' });
+    }
+
+    const newReport = await Report.create({
+      title,
+      entityName,
+      selectedFields,
+      filters: filters || []
     });
+
+    res.status(201).json(newReport);
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка при создании отчёта' });
   }
-
-  const newReport = {
-    id: reports.length > 0 ? Math.max(...reports.map(r => r.id)) + 1 : 1,
-    title,
-    entityName,
-    selectedFields,
-    filters: filters || [],
-    createdAt: new Date().toISOString()
-  };
-
-  reports.push(newReport);
-  res.status(201).json(newReport);
 });
 
-app.put('/reports/:id', (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const index = reports.findIndex(r => r.id === id);
+// 4. PUT /reports/:id (обновление отчёта)
+app.put('/reports/:id', async (req, res) => {
+  try {
+    const { title, entityName, selectedFields, filters } = req.body;
 
-  if (index === -1) {
-    return res.status(404).json({ error: `Отчёт с ID ${id} не найден` });
+    if (!title || !entityName || !Array.isArray(selectedFields)) {
+      return res.status(400).json({ error: 'Некорректные данные' });
+    }
+
+    const report = await Report.findByPk(req.params.id);
+    if (!report) {
+      return res.status(404).json({ error: 'Отчёт не найден' });
+    }
+
+    await report.update({
+      title,
+      entityName,
+      selectedFields,
+      filters: filters || []
+    });
+
+    res.json(report);
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка при обновлении' });
   }
-
-  const { title, entityName, selectedFields, filters } = req.body;
-
-  if (!title || !entityName || !Array.isArray(selectedFields)) {
-    return res.status(400).json({ error: 'Некорректная структура объекта для обновления' });
-  }
-
-  reports[index] = {
-    ...reports[index],
-    title,
-    entityName,
-    selectedFields,
-    filters: filters || []
-  };
-
-  res.json(reports[index]);
 });
 
-app.delete('/reports/:id', (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const index = reports.findIndex(r => r.id === id);
+// 5. DELETE /reports/:id (удаление отчёта)
+app.delete('/reports/:id', async (req, res) => {
+  try {
+    const report = await Report.findByPk(req.params.id);
+    if (!report) {
+      return res.status(404).json({ error: 'Отчёт не найден' });
+    }
 
-  if (index === -1) {
-    return res.status(404).json({ error: `Отчёт с ID ${id} не найден` });
+    await report.destroy();
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка при удалении' });
   }
-
-  reports.splice(index, 1);
-  res.status(204).send();
 });
 
+// Глобальная обработка ошибок
 app.use((err, req, res, next) => {
-  console.error(err.stack);
   res.status(500).json({ error: 'Внутренняя ошибка сервера' });
 });
 
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Сервер запущен на http://localhost:${PORT}`);
+  console.log(`Сервер запущен на порту ${PORT}`);
 });
