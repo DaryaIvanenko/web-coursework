@@ -4,7 +4,6 @@ const { Report } = require('./models');
 
 app.use(express.json());
 
-// 1. GET /reports (получение всех отчётов или с фильтрацией по query)
 app.get('/reports', async (req, res) => {
   try {
     const { entityName } = req.query;
@@ -17,7 +16,6 @@ app.get('/reports', async (req, res) => {
   }
 });
 
-// 2. GET /reports/:id (поиск отчёта по ID)
 app.get('/reports/:id', async (req, res) => {
   try {
     const report = await Report.findByPk(req.params.id);
@@ -30,7 +28,6 @@ app.get('/reports/:id', async (req, res) => {
   }
 });
 
-// 3. POST /reports (создание отчёта)
 app.post('/reports', async (req, res) => {
   try {
     const { title, entityName, selectedFields, filters } = req.body;
@@ -52,7 +49,6 @@ app.post('/reports', async (req, res) => {
   }
 });
 
-// 4. PUT /reports/:id (обновление отчёта)
 app.put('/reports/:id', async (req, res) => {
   try {
     const { title, entityName, selectedFields, filters } = req.body;
@@ -79,7 +75,6 @@ app.put('/reports/:id', async (req, res) => {
   }
 });
 
-// 5. DELETE /reports/:id (удаление отчёта)
 app.delete('/reports/:id', async (req, res) => {
   try {
     const report = await Report.findByPk(req.params.id);
@@ -94,7 +89,6 @@ app.delete('/reports/:id', async (req, res) => {
   }
 });
 
-// Глобальная обработка ошибок
 app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Внутренняя ошибка сервера' });
 });
