@@ -6,10 +6,14 @@ module.exports = (sequelize, DataTypes) => {
     }
   }
   Report.init({
-    title: DataTypes.STRING,
+    title: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
     entityName: DataTypes.STRING,
     selectedFields: DataTypes.JSON,
-    filters: DataTypes.JSON
+    filters: DataTypes.JSON,
+    description: DataTypes.STRING
   }, {
     sequelize,
     modelName: 'Report',
