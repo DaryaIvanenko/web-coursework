@@ -82,7 +82,7 @@ app.post('/auth/login', async (req, res) => {
       { id: user.id, email: user.email, role: user.role },
       JWT_SECRET,
       { expiresIn: '1h' }
-    );
+    ); 
 
     res.json({
       token,
