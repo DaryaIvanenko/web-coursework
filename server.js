@@ -64,7 +64,6 @@ app.post('/auth/register', async (req, res) => {
   }
 });
 
-// POST /auth/login — Вход и выдача JWT
 app.post('/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -94,7 +93,6 @@ app.post('/auth/login', async (req, res) => {
   }
 });
 
-// GET /profile — Защищенный маршрут получения профиля
 app.get('/profile', authenticateToken, async (req, res) => {
   try {
     const user = await User.findByPk(req.user.id, {
@@ -106,7 +104,6 @@ app.get('/profile', authenticateToken, async (req, res) => {
   }
 });
 
-// GET /admin/users — Маршрут только для администратора (доп. механизм RBAC)
 app.get('/admin/users', authenticateToken, isAdmin, async (req, res) => {
   try {
     const users = await User.findAll({ attributes: ['id', 'email', 'role', 'createdAt'] });
@@ -116,7 +113,6 @@ app.get('/admin/users', authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
-// 1. GET /reports (получение всех отчётов или с фильтрацией по query)
 app.get('/reports', async (req, res) => {
   try {
     const { entityName } = req.query;
@@ -129,7 +125,6 @@ app.get('/reports', async (req, res) => {
   }
 });
 
-// 2. GET /reports/:id (поиск отчёта по ID)
 app.get('/reports/:id', async (req, res) => {
   try {
     const report = await Report.findByPk(req.params.id);
@@ -142,7 +137,6 @@ app.get('/reports/:id', async (req, res) => {
   }
 });
 
-// 3. POST /reports (создание отчёта)
 app.post('/reports', async (req, res) => {
   try {
     const { title, entityName, selectedFields, filters } = req.body;
@@ -164,7 +158,6 @@ app.post('/reports', async (req, res) => {
   }
 });
 
-// 4. PUT /reports/:id (обновление отчёта)
 app.put('/reports/:id', async (req, res) => {
   try {
     const { title, entityName, selectedFields, filters } = req.body;
@@ -191,7 +184,6 @@ app.put('/reports/:id', async (req, res) => {
   }
 });
 
-// 5. DELETE /reports/:id (удаление отчёта)
 app.delete('/reports/:id', async (req, res) => {
   try {
     const report = await Report.findByPk(req.params.id);
@@ -206,7 +198,6 @@ app.delete('/reports/:id', async (req, res) => {
   }
 });
 
-// Глобальная обработка ошибок
 app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Внутренняя ошибка сервера' });
 });
