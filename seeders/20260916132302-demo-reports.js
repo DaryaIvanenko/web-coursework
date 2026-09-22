@@ -11,7 +11,8 @@ module.exports = {
         filters: JSON.stringify([{ field: 'total_amount', operator: 'GREATER_THAN', value: 10000 }]),
         description: 'Отчёт по крупным заказам клиента за всё время',
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
+        userId: 1
       },
       {
         title: 'Заканчивающиеся товары на складе',
