@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const { Deal, Client, Product } = require('../models');
 
-// GET /api/reports/data?entity=Клиенты
 router.get('/data', async (req, res) => {
   try {
     const { entity } = req.query;
@@ -11,7 +10,6 @@ router.get('/data', async (req, res) => {
 
     if (entity === 'Клиенты') {
       const clients = await Client.findAll();
-      // Маппим ключи под названия колонок из вашей таблицы
       data = clients.map(item => ({
         'ID клиента': item.id,
         'Имя': item.name,
@@ -29,7 +27,6 @@ router.get('/data', async (req, res) => {
         'Остаток на складе': item.stock
       }));
     } else {
-      // По умолчанию: 'Продажи и Сделки'
       const deals = await Deal.findAll();
       data = deals.map(item => ({
         'ID сделки': item.id,

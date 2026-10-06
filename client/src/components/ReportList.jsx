@@ -75,7 +75,6 @@ export default function ReportList({ reports = [], onCreate, onDelete }) {
     const entityString = typeof report === 'object' ? report.entityName : report;
 
     try {
-      // api.js сам добавляет заголовок Authorization: Bearer <token>
       const { data } = await api.get('/reports/data', { params: { entity: entityString } });
       setReportData(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -91,7 +90,6 @@ export default function ReportList({ reports = [], onCreate, onDelete }) {
     setReportData([]);
   };
 
-  // Заголовок страницы
   useEffect(() => {
     document.title = `Отчётов: ${reports.length} — Конструктор отчётов`;
   }, [reports]);
@@ -135,7 +133,7 @@ export default function ReportList({ reports = [], onCreate, onDelete }) {
 
   try {
     if (typeof onCreate === 'function') {
-      await onCreate(newReport); // Вызываем функцию из App.jsx
+      await onCreate(newReport);
     }
     setReportTitle('');
     setFilterValue('');
@@ -147,7 +145,6 @@ export default function ReportList({ reports = [], onCreate, onDelete }) {
 };
 const handleDeleteReport = (reportId) => {
   if (!window.confirm('Вы уверены, что хотите удалить этот отчет?')) return;
-  // Сам DELETE-запрос (с оптимистичным обновлением и откатом) выполняет App.jsx
   if (typeof onDelete === 'function') onDelete(reportId);
 };
   const filteredReports = reports.filter((report) => {

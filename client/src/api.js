@@ -6,7 +6,6 @@ const api = axios.create({
   baseURL: API_URL,
 });
 
-// Перехватчик: перед каждым запросом подставляет актуальный JWT-токен
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {

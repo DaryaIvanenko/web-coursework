@@ -35,7 +35,6 @@ function MainContent() {
     return () => controller.abort(); // отмена при размонтировании
   }, [user, loadReports]);
 
-  // CREATE: оптимистично, с временным id
   const handleCreateReport = async (newData) => {
     const tempId = `tmp-${Date.now()}`;
     setReports((prev) => [{ ...newData, id: tempId, userId: user.id }, ...prev]);

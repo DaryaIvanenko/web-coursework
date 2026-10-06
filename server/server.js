@@ -8,20 +8,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// --- Роуты ---
-
-// Авторизация (без токена): /auth/login, /auth/register
 app.use('/auth', require('../routes/auth'));
 
-// ВАЖНО: /reports/data должен быть подключён РАНЬШЕ, чем /reports/:id,
-// иначе запрос "/reports/data" попадёт в обработчик "/:id".
-// reportRoutes обрабатывает только GET /data, остальное пропускает дальше.
 app.use('/reports', authenticateToken, require('../routes/reportRoutes'));
 
-// CRUD отчётов: GET/POST /reports, GET/PUT/DELETE /reports/:id
 app.use('/reports', require('../routes/reports'));
 
-// Список пользователей (без хэшей паролей)
 app.get('/users', authenticateToken, async (req, res) => {
   try {
     const { email } = req.query;
@@ -38,7 +30,6 @@ app.get('/users', authenticateToken, async (req, res) => {
   }
 });
 
-// --- 404 и глобальный обработчик ошибок ---
 
 app.use((req, res) => {
   res.status(404).json({ message: `Маршрут ${req.method} ${req.originalUrl} не найден` });

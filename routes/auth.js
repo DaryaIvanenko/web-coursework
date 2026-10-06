@@ -36,14 +36,12 @@ router.post('/login', async (req, res) => {
 
     console.log('🔑 Попытка входа для:', email);
 
-    // Ищем пользователя по email
     const user = await User.findOne({ where: { email } });
     if (!user) {
       console.log('❌ Пользователь с таким email не найден');
       return res.status(401).json({ message: 'Неверный email или пароль' });
     }
 
-    // Определяем, в какаом поле хранятся данные пароля
     const passwordInDb = user.passwordHash || user.password;
     console.log('👤 Пользователь найден');
 
@@ -54,11 +52,9 @@ router.post('/login', async (req, res) => {
 
     let isValidPassword = false;
 
-    // Проверяем: если пароль в БД начинаются с $2a$ или $2b$, то это bcrypt-хэш
     if (passwordInDb.startsWith('$2a$') || passwordInDb.startsWith('$2b$')) {
       isValidPassword = await bcrypt.compare(password, passwordInDb);
     } else {
-      // Если в БД записан обычный открытый текст (например, "admin" или "12345")
       console.log('⚠️ Пароль в БД сохранен открытым текстом, проверяем прямым сравнением');
       isValidPassword = (password === passwordInDb);
     }

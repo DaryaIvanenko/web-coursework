@@ -5,7 +5,6 @@ const { authenticateToken } = require('../middleware/auth');
 
 const isAdminUser = (user) => user.role?.toLowerCase() === 'admin';
 
-// Находит отчёт и проверяет права; возвращает отчёт или null (ответ уже отправлен)
 async function findOwnedReport(req, res) {
   const report = await Report.findByPk(req.params.id);
   if (!report) {
@@ -19,7 +18,6 @@ async function findOwnedReport(req, res) {
   return report;
 }
 
-// GET /reports
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const where = isAdminUser(req.user) ? {} : { userId: req.user.id };
@@ -31,7 +29,6 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-// POST /reports
 router.post('/', authenticateToken, async (req, res) => {
   try {
     const { title, entityName, selectedFields, filters, description } = req.body;
@@ -52,7 +49,6 @@ router.post('/', authenticateToken, async (req, res) => {
   }
 });
 
-// GET /reports/:id
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const report = await findOwnedReport(req, res);
@@ -62,7 +58,6 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// PUT /reports/:id
 router.put('/:id', authenticateToken, async (req, res) => {
   try {
     const report = await findOwnedReport(req, res);
