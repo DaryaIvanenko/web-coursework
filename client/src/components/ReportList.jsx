@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 
 const MOCK_DATABASE = {
@@ -55,6 +55,11 @@ export default function ReportList() {
 
   const [activeReport, setActiveReport] = useState(null);
 
+  // Состояния поиска
+  const [reportSearchQuery, setReportSearchQuery] = useState(''); // Поиск по шаблонам
+  const [tableSearchQuery, setTableSearchQuery] = useState('');   // Поиск внутри таблицы отчета
+
+  // Состояния формы
   const [title, setTitle] = useState('');
   const [moduleId, setModuleId] = useState('clients');
   const [selectedFields, setSelectedFields] = useState(['fullName', 'email']);
@@ -64,7 +69,7 @@ export default function ReportList() {
 
   const currentModule = AVAILABLE_MODULES.find((m) => m.id === moduleId);
 
-  const generateReportData = (report) => {
+  const generateReportData = useCallback((report) => {
     if (!report) return [];
     const rawData = MOCK_DATABASE[report.moduleId] || [];
 
@@ -86,17 +91,16 @@ export default function ReportList() {
           return true;
       }
     });
-  };
+  }, []);
 
-useEffect(() => {
-  if (activeReport) {
-    const resultsCount = generateReportData(activeReport).length;
-    // Название: "[Записей: 3] Отчёт по клиентам (Всего шаблонов: 2)"
-    document.title = `Записей в "${activeReport.title}": ${resultsCount}, отчётов: ${reports.length})`;
-  } else {
-    document.title = `Отчётов: ${reports.length} — Конструктор отчётов`;
-  }
-}, [reports, activeReport, generateReportData]);
+  useEffect(() => {
+    if (activeReport) {
+      const resultsCount = generateReportData(activeReport).length;
+      document.title = `Записей в "${activeReport.title}": ${resultsCount}, отчётов: ${reports.length}`;
+    } else {
+      document.title = `Отчётов: ${reports.length} — Конструктор отчётов`;
+    }
+  }, [reports, activeReport, generateReportData]);
 
   const resetForm = () => {
     setEditingId(null);
@@ -111,8 +115,10 @@ useEffect(() => {
   const handleModuleChange = (newModuleId) => {
     setModuleId(newModuleId);
     const newMod = AVAILABLE_MODULES.find((m) => m.id === newModuleId);
-    setSelectedFields([newMod.fields[0].id]);
-    setFilterField(newMod.fields[0].id);
+    if (newMod && newMod.fields.length > 0) {
+      setSelectedFields([newMod.fields[0].id]);
+      setFilterField(newMod.fields[0].id);
+    }
   };
 
   const handleFieldToggle = (fieldId) => {
@@ -159,10 +165,16 @@ useEffect(() => {
     if (activeReport?.id === id) setActiveReport(null);
   };
 
+  // Фильтрация списка шаблонов по поисковому запросу
+  const filteredReports = reports.filter((report) =>
+    report.title.toLowerCase().includes(reportSearchQuery.toLowerCase().trim())
+  );
+
   return (
     <div style={{ maxWidth: '950px', margin: '0 auto', padding: '20px', fontFamily: 'sans-serif' }}>
       <h2>📊 Конструктор пользовательских отчётов</h2>
 
+      {/* --- ФОРМА СОЗДАНИЯ / РЕДАКТИРОВАНИЯ --- */}
       <form onSubmit={handleSubmit} style={{ background: '#f8f9fa', padding: '20px', borderRadius: '8px', marginBottom: '25px', border: '1px solid #e9ecef' }}>
         <h3>{editingId ? '✏️ Редактирование шаблона' : 'Создать новый шаблон отчёта'}</h3>
 
@@ -192,7 +204,7 @@ useEffect(() => {
         <div style={{ marginBottom: '15px' }}>
           <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '8px' }}>Колонки для выборки:</label>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', background: '#fff', padding: '10px', borderRadius: '4px', border: '1px solid #ccc' }}>
-            {currentModule.fields.map((field) => (
+            {currentModule?.fields.map((field) => (
               <label key={field.id} style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', fontSize: '14px' }}>
                 <input type="checkbox" checked={selectedFields.includes(field.id)} onChange={() => handleFieldToggle(field.id)} />
                 {field.label}
@@ -205,7 +217,7 @@ useEffect(() => {
           <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '5px' }}>Условие фильтрации:</label>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
             <select value={filterField} onChange={(e) => setFilterField(e.target.value)} style={{ padding: '8px' }}>
-              {currentModule.fields.map((f) => (
+              {currentModule?.fields.map((f) => (
                 <option key={f.id} value={f.id}>{f.label}</option>
               ))}
             </select>
@@ -231,32 +243,48 @@ useEffect(() => {
         </div>
       </form>
 
-      <h3>Сохранённые шаблоны отчётов</h3>
+      {/* --- СПИСОК ШАБЛОНОВ С ПОИСКОМ --- */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+        <h3 style={{ margin: 0 }}>Сохранённые шаблоны отчётов</h3>
+        <input
+          type="text"
+          placeholder="🔍 Поиск шаблона..."
+          value={reportSearchQuery}
+          onChange={(e) => setReportSearchQuery(e.target.value)}
+          style={{ padding: '6px 12px', borderRadius: '4px', border: '1px solid #ccc', width: '220px' }}
+        />
+      </div>
+
       <ul style={{ listStyle: 'none', padding: 0 }}>
-        {reports.map((report) => {
-          const mod = AVAILABLE_MODULES.find((m) => m.id === report.moduleId);
-          return (
-            <li key={report.id} style={{ border: '1px solid #ddd', padding: '12px 16px', borderRadius: '6px', marginBottom: '10px', backgroundColor: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h4 style={{ margin: '0 0 6px 0' }}>{report.title}</h4>
-                <div style={{ fontSize: '13px', color: '#555' }}>Раздел: <b>{mod?.label}</b></div>
-              </div>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button onClick={() => setActiveReport(report)} style={{ backgroundColor: '#52c41a', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>
-                  Просмотреть
-                </button>
-                <button onClick={() => handleStartEdit(report)} style={{ backgroundColor: '#1890ff', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>
-                  Изменить
-                </button>
-                <button onClick={() => handleDelete(report.id)} style={{ backgroundColor: '#dc3545', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>
-                  Удалить
-                </button>
-              </div>
-            </li>
-          );
-        })}
+        {filteredReports.length === 0 ? (
+          <p style={{ color: '#888', fontStyle: 'italic' }}>Шаблоны отчётов не найдены.</p>
+        ) : (
+          filteredReports.map((report) => {
+            const mod = AVAILABLE_MODULES.find((m) => m.id === report.moduleId);
+            return (
+              <li key={report.id} style={{ border: '1px solid #ddd', padding: '12px 16px', borderRadius: '6px', marginBottom: '10px', backgroundColor: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h4 style={{ margin: '0 0 6px 0' }}>{report.title}</h4>
+                  <div style={{ fontSize: '13px', color: '#555' }}>Раздел: <b>{mod?.label}</b></div>
+                </div>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button onClick={() => { setActiveReport(report); setTableSearchQuery(''); }} style={{ backgroundColor: '#52c41a', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>
+                    Просмотреть
+                  </button>
+                  <button onClick={() => handleStartEdit(report)} style={{ backgroundColor: '#1890ff', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>
+                    Изменить
+                  </button>
+                  <button onClick={() => handleDelete(report.id)} style={{ backgroundColor: '#dc3545', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>
+                    Удалить
+                  </button>
+                </div>
+              </li>
+            );
+          })
+        )}
       </ul>
 
+      {/* --- ТАБЛИЦА ПРОСМОТРА С ЖИВЫМ ПОИСКОМ --- */}
       {activeReport && (
         <div style={{ marginTop: '30px', padding: '20px', background: '#e6f7ff', borderRadius: '8px', border: '1px solid #91d5ff' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
@@ -264,11 +292,28 @@ useEffect(() => {
             <button onClick={() => setActiveReport(null)} style={{ background: 'transparent', border: 'none', fontSize: '16px', cursor: 'pointer' }}>❌ Закрыть</button>
           </div>
 
+          <div style={{ marginBottom: '15px' }}>
+            <input
+              type="text"
+              placeholder="🔍 Фильтр по строкам в таблице..."
+              value={tableSearchQuery}
+              onChange={(e) => setTableSearchQuery(e.target.value)}
+              style={{ width: '100%', padding: '8px 12px', borderRadius: '4px', border: '1px solid #91d5ff', boxSizing: 'border-box' }}
+            />
+          </div>
+
           {(() => {
-            const reportData = generateReportData(activeReport);
+            const rawReportData = generateReportData(activeReport);
             const mod = AVAILABLE_MODULES.find((m) => m.id === activeReport.moduleId);
 
-            if (reportData.length === 0) {
+            // Фильтрация данных таблицы по поисковой строке
+            const finalReportData = rawReportData.filter((row) =>
+              activeReport.selectedFields.some((fieldId) =>
+                String(row[fieldId] || '').toLowerCase().includes(tableSearchQuery.toLowerCase().trim())
+              )
+            );
+
+            if (finalReportData.length === 0) {
               return <p style={{ color: '#888' }}>По заданным условиям данные не найдены.</p>;
             }
 
@@ -283,7 +328,7 @@ useEffect(() => {
                   </tr>
                 </thead>
                 <tbody>
-                  {reportData.map((row) => (
+                  {finalReportData.map((row) => (
                     <tr key={row.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
                       {activeReport.selectedFields.map((fId) => (
                         <td key={fId} style={{ padding: '10px', border: '1px solid #f0f0f0' }}>{row[fId]}</td>
