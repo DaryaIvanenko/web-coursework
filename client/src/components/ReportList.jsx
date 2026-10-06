@@ -55,11 +55,9 @@ export default function ReportList() {
 
   const [activeReport, setActiveReport] = useState(null);
 
-  // Состояния поиска
-  const [reportSearchQuery, setReportSearchQuery] = useState(''); // Поиск по шаблонам
-  const [tableSearchQuery, setTableSearchQuery] = useState('');   // Поиск внутри таблицы отчета
+  const [reportSearchQuery, setReportSearchQuery] = useState('');
+  const [tableSearchQuery, setTableSearchQuery] = useState('');
 
-  // Состояния формы
   const [title, setTitle] = useState('');
   const [moduleId, setModuleId] = useState('clients');
   const [selectedFields, setSelectedFields] = useState(['fullName', 'email']);
@@ -174,7 +172,6 @@ export default function ReportList() {
     <div style={{ maxWidth: '950px', margin: '0 auto', padding: '20px', fontFamily: 'sans-serif' }}>
       <h2>📊 Конструктор пользовательских отчётов</h2>
 
-      {/* --- ФОРМА СОЗДАНИЯ / РЕДАКТИРОВАНИЯ --- */}
       <form onSubmit={handleSubmit} style={{ background: '#f8f9fa', padding: '20px', borderRadius: '8px', marginBottom: '25px', border: '1px solid #e9ecef' }}>
         <h3>{editingId ? '✏️ Редактирование шаблона' : 'Создать новый шаблон отчёта'}</h3>
 
@@ -242,8 +239,6 @@ export default function ReportList() {
           )}
         </div>
       </form>
-
-      {/* --- СПИСОК ШАБЛОНОВ С ПОИСКОМ --- */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
         <h3 style={{ margin: 0 }}>Сохранённые шаблоны отчётов</h3>
         <input
@@ -284,7 +279,6 @@ export default function ReportList() {
         )}
       </ul>
 
-      {/* --- ТАБЛИЦА ПРОСМОТРА С ЖИВЫМ ПОИСКОМ --- */}
       {activeReport && (
         <div style={{ marginTop: '30px', padding: '20px', background: '#e6f7ff', borderRadius: '8px', border: '1px solid #91d5ff' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
@@ -306,7 +300,6 @@ export default function ReportList() {
             const rawReportData = generateReportData(activeReport);
             const mod = AVAILABLE_MODULES.find((m) => m.id === activeReport.moduleId);
 
-            // Фильтрация данных таблицы по поисковой строке
             const finalReportData = rawReportData.filter((row) =>
               activeReport.selectedFields.some((fieldId) =>
                 String(row[fieldId] || '').toLowerCase().includes(tableSearchQuery.toLowerCase().trim())
