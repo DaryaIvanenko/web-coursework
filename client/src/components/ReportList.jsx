@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 const ENTITY_COLUMNS = {
@@ -41,6 +41,8 @@ export default function ReportList({ reports = [], onCreate, onDelete }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
 
+   const [activeReport, setActiveReport] = useState(null);
+
   // Состояния формы конструктора
   const [reportTitle, setReportTitle] = useState('');
   const [entityName, setEntityName] = useState('Продажи и Сделки');
@@ -55,6 +57,40 @@ export default function ReportList({ reports = [], onCreate, onDelete }) {
 
   const [sortBy, setSortBy] = useState('Дата продажи');
   const [sortOrder, setSortOrder] = useState('По убыванию (DESC)');
+
+    const generateReportData = useCallback((report) => {
+    if (!report) return [];
+    const rawData = MOCK_DATABASE?.[report?.moduleId] || [];
+
+    return rawData.filter((item) => {
+      if (!report.filterValue) return true;
+      const fieldValue = String(item[report.filterField], '').toLowerCase();
+      const targetValue = report.filterValue.toLowerCase();
+
+      switch (report.filterOperator) {
+        case 'equals':
+          return fieldValue === targetValue;
+        case 'contains':
+          return fieldValue.includes(targetValue);
+        case 'greater':
+          return Number(item[report.filterField]) > Number(targetValue);
+        case 'less':
+          return Number(item[report.filterField]) < Number(targetValue);
+        default:
+          return true;
+      }
+    });
+  }, []);
+
+    useEffect(() => {
+    if (activeReport) {
+      const resultsCount = generateReportData(activeReport).length;
+      document.title = `Записей в "${activeReport.title}": ${resultsCount}, отчётов: ${reports.length}`;
+    } else {
+      document.title = `Отчётов: ${reports.length} — Конструктор отчётов`;
+    }
+  }, [reports, activeReport, generateReportData]);
+
 
   useEffect(() => {
     const timer = setTimeout(() => {
