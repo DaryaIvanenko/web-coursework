@@ -9,11 +9,11 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false
     },
     selectedFields: {
-      type: DataTypes.JSON, // Массив выбранных колонок
+      type: DataTypes.JSON,
       allowNull: true
     },
     filters: {
-      type: DataTypes.JSON, // Объект или массив фильтров
+      type: DataTypes.JSON,
       allowNull: true
     },
     description: {

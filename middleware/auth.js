@@ -1,21 +1,21 @@
 const jwt = require('jsonwebtoken');
 
-const authenticateToken = (req, res, next) => {
+function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    return res.status(401).json({ message: 'Доступ запрещен: токен не предоставлен' });
+    return res.status(401).json({ message: 'Токен отсутствует' });
   }
 
-  jwt.verify(token, process.env.JWT_SECRET || 'super_secret_key_12345', (err, decoded) => {
+  jwt.verify(token, process.env.JWT_SECRET || 'super_secret_key_12345', (err, user) => {
     if (err) {
-      return res.status(403).json({ message: 'Недействительный или истекший токен' });
+      return res.status(403).json({ message: 'Недействительный токен' });
     }
-    req.user = decoded;
+    req.user = user;
     next();
   });
-};
+}
 
 const isAdmin = (req, res, next) => {
   if (req.user && req.user.role === 'admin') {

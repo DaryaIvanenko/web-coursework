@@ -1,72 +1,76 @@
 const express = require('express');
 const router = express.Router();
-const { Report, User } = require('../models');
+const { Report } = require('../models');
+const { authenticateToken, isAdmin } = require('../middleware/auth');
 
-// 1. ПОЛУЧЕНИЕ ОТЧЁТОВ
-router.get('/', async (req, res) => {
+// 1. GET /reports — получение отчетов
+router.get('/', authenticateToken, async (req, res) => {
   try {
     const { userId, role } = req.query;
 
-    // Если Админ — получаем отчёты всех пользователей
-    // Если Юзер — фильтруем по userId
-    const whereCondition = role === 'ADMIN' ? {} : { userId: userId };
+    console.log(`📥 Запрос отчетов для userId: ${userId}, role: ${role}`);
 
-    const reports = await Report.findAll({
-      where: whereCondition,
-      order: [['createdAt', 'DESC']]
-    });
+    let reports = [];
+    if (role === 'admin') {
+      reports = await Report.findAll();
+    } else {
+      reports = await Report.findAll({ where: { userId } });
+    }
 
+    // Возвращаем найденные отчеты (или пустой массив [])
     return res.json(reports);
   } catch (error) {
-    console.error('Ошибка БД:', error);
+    console.error('❌ Ошибка в GET /reports:', error);
     return res.status(500).json({ error: error.message });
   }
 });
 
-// 2. СОЗДАНИЕ ОТЧЁТА
-router.post('/', async (req, res) => {
+// 2. POST /reports — создание отчета
+router.post('/', authenticateToken, async (req, res) => {
   try {
-    const { title, entityName, selectedFields, filters, description, userId } = req.body;
+    const { title, entityName, selectedFields, filters, description } = req.body;
 
     const newReport = await Report.create({
       title,
-      entityName,
-      selectedFields,
-      filters,
-      description,
-      userId
+      entityName: entityName || 'Продажи',
+      selectedFields: selectedFields || [],
+      filters: filters || {},
+      description: description || '',
+      userId: req.user.id // автоматически берется из JWT
     });
 
     return res.status(201).json(newReport);
   } catch (error) {
-    console.error('Ошибка при создании отчёта:', error);
-    return res.status(400).json({ error: error.message });
+    console.error('❌ Ошибка POST /reports:', error);
+    return res.status(500).json({ error: error.message });
   }
 });
 
-// 3. УДАЛЕНИЕ ОТЧЁТА (Для Админа)
-router.delete('/:id', async (req, res) => {
+// 3. GET /reports/:id — просмотр детальной информации
+router.get('/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const report = await Report.findByPk(id);
+
+    if (!report) {
+      return res.status(404).json({ error: 'Отчёт не найден' });
+    }
+
+    return res.json(report);
+  } catch (error) {
+    console.error('❌ Ошибка GET /reports/:id:', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// 4. DELETE /reports/:id — удаление отчета (только admin)
+router.delete('/:id', authenticateToken, isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     await Report.destroy({ where: { id } });
-    res.json({ message: 'Отчёт успешно удалён' });
+    return res.json({ message: 'Отчёт удалён' });
   } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get('/users', async (req, res) => {
-  try {
-    const { email } = req.query;
-
-    // ВАЖНО: Sequelize ищет совпадения по полю email в модели User
-    const whereCondition = email ? { email } : {};
-
-    const users = await User.findAll({ where: whereCondition });
-    return res.json(users);
-  } catch (error) {
-    // ВЫВЕДИТЕ ТЕКСТ ОШИБКИ В КОНСОЛЬ БЭКЕНДА
-    console.error('❌ Ошибка Sequelize при запросе пользователей:', error);
+    console.error('❌ Ошибка DELETE /reports:', error);
     return res.status(500).json({ error: error.message });
   }
 });

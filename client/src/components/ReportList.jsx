@@ -58,7 +58,6 @@ const [isModalOpen, setIsModalOpen] = useState(false);
   const [sortBy, setSortBy] = useState('Дата продажи');
   const [sortOrder, setSortOrder] = useState('По убыванию (DESC)');
 
-  // Загрузка данных отчета
   const fetchReportData = useCallback(async (entity) => {
     if (!entity) return;
     setLoading(true);
@@ -77,9 +76,8 @@ const [isModalOpen, setIsModalOpen] = useState(false);
 
 const handleOpenReport = async (report) => {
   setLoading(true);
-  setSelectedReport(report); // 👈 КЛЮЧЕВОЙ МОМЕНТ: записываем объект отчёта, чтобы сработало {selectedReport && ...}
+  setSelectedReport(report);
 
-  // Забираем строку сущности (например, "Клиенты") из переданного отчёта:
   const entityString = typeof report === 'object' ? report.entityName : report;
 
   try {
@@ -101,7 +99,6 @@ const handleOpenReport = async (report) => {
   }
 };
 
-// 2. Функция закрытия модального окна:
 const handleCloseModal = () => {
   setSelectedReport(null);
   setReportData([]);
@@ -171,7 +168,6 @@ const handleCloseModal = () => {
   return (
     <div style={{ maxWidth: '900px', margin: '20px auto', fontFamily: 'Arial, sans-serif', color: '#333' }}>
       
-      {/* Панель пользователя */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', padding: '10px 15px', backgroundColor: '#f8f9fa', borderRadius: '6px', border: '1px solid #e9ecef' }}>
         <div>
           Вы вошли как: <b>{user?.email}</b> ({isAdmin ? '👑 Администратор' : '👤 Пользователь'})
@@ -185,7 +181,6 @@ const handleCloseModal = () => {
         📊 Конструктор отчётов по продажам и клиентам
       </h2>
 
-      {/* --- ФОРМА КОНСТРУКТОРА --- */}
       <form onSubmit={handleSubmit} style={{ background: '#fff', border: '1px solid #e0e0e0', padding: '24px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', marginBottom: '30px' }}>
         <h3 style={{ textAlign: 'center', color: '#6c63ff', marginTop: 0, marginBottom: '20px' }}>
           Настроить новый отчёт
@@ -267,7 +262,6 @@ const handleCloseModal = () => {
           </div>
         </div>
 
-        {/* Агрегация и Группировка */}
         <div style={{ backgroundColor: '#f0f4f8', padding: '15px', borderRadius: '6px', marginBottom: '18px' }}>
           <div style={{ fontWeight: 'bold', textAlign: 'center', marginBottom: '10px', color: '#555' }}>
             📊 Агрегация и Группировка (GROUP BY):
@@ -292,7 +286,6 @@ const handleCloseModal = () => {
           </div>
         </div>
 
-        {/* Сортировка */}
         <div style={{ marginBottom: '24px' }}>
           <div style={{ fontWeight: 'bold', textAlign: 'center', marginBottom: '10px', color: '#555' }}>
             ⇅ Сортировка (ORDER BY):
@@ -371,7 +364,6 @@ const handleCloseModal = () => {
         </div>
       )}
 
-      {/* --- МОДАЛЬНОЕ ОКНО: ТАБЛИЦА С ДАННЫМИ ОТЧЁТА --- */}
       {selectedReport && (
   <div 
     className="modal-overlay" 

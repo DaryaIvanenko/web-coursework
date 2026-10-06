@@ -3,7 +3,6 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginForm from './components/LoginForm';
 import ReportList from './components/ReportList';
 
-// Берем URL из переменных окружения Vite (http://localhost:3000)
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 function MainContent() {
@@ -11,34 +10,41 @@ function MainContent() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // 1. ЗАГРУЗКА ИЗ БАЗЫ ДАННЫХ
   useEffect(() => {
     if (!user) return;
+const loadReports = async () => {
+  setLoading(true);
+  try {
+    const token = localStorage.getItem('token');
+    
+    if (!token || !user) return;
 
-    const loadReports = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(
-          `${API_URL}/reports?userId=${user.id}&role=${user.role}`
-        );
-
-        if (!response.ok) {
-          throw new Error(`Ошибка сервера: ${response.status}`);
-        }
-
-        const data = await response.json();
-        setReports(data);
-      } catch (error) {
-        console.error('Не удалось загрузить отчёты из БД:', error);
-      } finally {
-        setLoading(false);
+    const response = await fetch(`${API_URL}/reports?userId=${user.id}&role=${user.role}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
       }
-    };
+    });
+
+    if (!response.ok) {
+      throw new Error(`Ошибка: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('Загруженные отчеты из БД:', data);
+
+    // Сохраняем массив отчетов
+    setReports(Array.isArray(data) ? data : []);
+  } catch (error) {
+    console.error(' Ошибка загрузки отчетов:', error);
+  } finally {
+    setLoading(false); 
+  }
+};
 
     loadReports();
   }, [user]);
 
-  // 2. СОЗДАНИЕ ОТЧЁТА (Кнопка "Создать")
   const handleCreateReport = async (newReportData) => {
     try {
       const response = await fetch(`${API_URL}/reports`, {
@@ -60,7 +66,6 @@ function MainContent() {
     }
   };
 
-  // 3. УДАЛЕНИЕ ОТЧЁТА (Кнопка "Удалить")
   const handleDeleteReport = async (id) => {
     try {
       const response = await fetch(`${API_URL}/reports/${id}`, {
@@ -82,7 +87,6 @@ function MainContent() {
   if (!user) return <LoginForm />;
   if (loading) return <p style={{ textAlign: 'center', marginTop: '50px' }}>Загрузка из PostgreSQL...</p>;
 
-  // Обязательно передаем пропсы onCreate и onDelete!
   return (
     <ReportList
       reports={reports}

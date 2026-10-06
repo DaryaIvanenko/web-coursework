@@ -10,34 +10,33 @@ export default function LoginForm() {
   const { login } = useAuth();
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  setError('');
+    e.preventDefault();
+    setError('');
 
-  try {
-    // Отправляем запрос с введенным логином/email
-    const response = await fetch(`${API_URL}/users?email=${encodeURIComponent(username)}`);
-    
-    if (!response.ok) {
-      throw new Error(`Ошибка сервера: ${response.status}`);
+    try {
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: username,
+          password: password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Неверный логин или пароль');
+      }
+      login(data.user, data.token);
+
+    } catch (err) {
+      console.error('Ошибка входа:', err);
+      setError(err.message || 'Не удалось связаться с сервером');
     }
-
-    const users = await response.json();
-
-    // Сверяем пароль
-    const foundUser = users.find(
-      (u) => u.email === username && u.passwordHash === password
-    );
-
-    if (foundUser) {
-      login(foundUser, 'token-' + foundUser.id);
-    } else {
-      setError('Неверный логин или пароль');
-    }
-  } catch (err) {
-    console.error('Ошибка входа:', err);
-    setError('Не удалось связаться с сервером БД');
-  }
-};
+  };
 
   return (
     <div style={{ maxWidth: '360px', margin: '80px auto', padding: '24px', border: '1px solid #ccc', borderRadius: '8px', fontFamily: 'sans-serif' }}>
