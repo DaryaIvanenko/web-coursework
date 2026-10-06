@@ -1,301 +1,433 @@
 import React, { useState, useEffect } from 'react';
-import { useLocalStorage } from '../hooks/useLocalStorage';
+import { useAuth } from '../context/AuthContext';
 
-const MOCK_DATABASE = {
-  clients: [
-    { id: 1, fullName: 'Иванов Иван Петрович', email: 'ivanov@mail.ru', registrationDate: '2026-01-15', status: 'Активен' },
-    { id: 2, fullName: 'Петров Сергей Васильевич', email: 'petrov@gmail.com', registrationDate: '2026-03-20', status: 'Заблокирован' },
-    { id: 3, fullName: 'Сидорова Анна Сергеевна', email: 'sidorova@yandex.ru', registrationDate: '2026-05-10', status: 'Активен' }
-  ],
-  orders: [
-    { id: 101, orderNumber: 'ORD-001', clientName: 'Иванов И.П.', totalAmount: 1500, orderDate: '2026-09-01' },
-    { id: 102, orderNumber: 'ORD-002', clientName: 'Сидорова А.С.', totalAmount: 450, orderDate: '2026-09-12' },
-    { id: 103, orderNumber: 'ORD-003', clientName: 'Петров С.В.', totalAmount: 3200, orderDate: '2026-09-25' }
-  ]
+const ENTITY_COLUMNS = {
+  'Продажи и Сделки': ['ID сделки', 'Сумма продажи', 'Количество товаров', 'Скидка (%)', 'Статус сделки', 'Дата продажи'],
+  'Клиенты': ['ID клиента', 'Имя', 'Email', 'Город', 'Дата регистрации'],
+  'Товары': ['ID товара', 'Название товара', 'Категория', 'Цена', 'Остаток на складе']
 };
 
-const AVAILABLE_MODULES = [
-  {
-    id: 'clients',
-    label: 'Клиенты и пользователи',
-    fields: [
-      { id: 'fullName', label: 'ФИО / Имя' },
-      { id: 'email', label: 'Электронная почта' },
-      { id: 'registrationDate', label: 'Дата регистрации' },
-      { id: 'status', label: 'Статус аккаунта' }
-    ]
-  },
-  {
-    id: 'orders',
-    label: 'Заказы и продажи',
-    fields: [
-      { id: 'orderNumber', label: 'Номер заказа' },
-      { id: 'clientName', label: 'Имя клиента' },
-      { id: 'totalAmount', label: 'Сумма заказа (руб.)' },
-      { id: 'orderDate', label: 'Дата оформления' }
-    ]
+// Функция-генератор тестовых данных для вывода в таблице отчёта
+const generateMockData = (entityName) => {
+  if (entityName === 'Клиенты') {
+    return [
+      { 'ID клиента': 101, 'Имя': 'Иван Иванов', 'Email': 'ivan@example.com', 'Город': 'Москва', 'Дата регистрации': '2024-01-15' },
+      { 'ID клиента': 102, 'Имя': 'Анна Смирнова', 'Email': 'anna@example.com', 'Город': 'Санкт-Петербург', 'Дата регистрации': '2024-02-10' },
+      { 'ID клиента': 103, 'Имя': 'Пётр Петров', 'Email': 'petr@example.com', 'Город': 'Казань', 'Дата регистрации': '2024-03-05' },
+      { 'ID клиента': 104, 'Имя': 'Ольга Сидорова', 'Email': 'olga@example.com', 'Город': 'Москва', 'Дата регистрации': '2024-03-12' },
+    ];
   }
-];
-
-const INITIAL_REPORTS = [
-  {
-    id: 1,
-    title: 'Отчёт по активным клиентам',
-    moduleId: 'clients',
-    selectedFields: ['fullName', 'email', 'status'],
-    filterField: 'status',
-    filterOperator: 'equals',
-    filterValue: 'Активен'
+  if (entityName === 'Товары') {
+    return [
+      { 'ID товара': 'P-01', 'Название товара': 'Ноутбук Pro 15', 'Категория': 'Электроника', 'Цена': 85000, 'Остаток на складе': 12 },
+      { 'ID товара': 'P-02', 'Название товара': 'Смартфон X', 'Категория': 'Электроника', 'Цена': 45000, 'Остаток на складе': 25 },
+      { 'ID товара': 'P-03', 'Название товара': 'Беспроводные наушники', 'Категория': 'Аксессуары', 'Цена': 7500, 'Остаток на складе': 50 },
+      { 'ID товара': 'P-04', 'Название товара': 'Механическая клавиатура', 'Категория': 'Аксессуары', 'Цена': 6200, 'Остаток на складе': 18 },
+    ];
   }
-];
+  // По умолчанию: 'Продажи и Сделки'
+  return [
+    { 'ID сделки': 'TRX-1001', 'Сумма продажи': 12500, 'Количество товаров': 2, 'Скидка (%)': 5, 'Статус сделки': 'Оплачено', 'Дата продажи': '2024-03-28' },
+    { 'ID сделки': 'TRX-1002', 'Сумма продажи': 45000, 'Количество товаров': 1, 'Скидка (%)': 0, 'Статус сделки': 'Оплачено', 'Дата продажи': '2024-03-29' },
+    { 'ID сделки': 'TRX-1003', 'Сумма продажи': 7800, 'Количество товаров': 3, 'Скидка (%)': 10, 'Статус сделки': 'В обработке', 'Дата продажи': '2024-03-30' },
+    { 'ID сделки': 'TRX-1004', 'Сумма продажи': 21000, 'Количество товаров': 2, 'Скидка (%)': 0, 'Статус сделки': 'Отменено', 'Дата продажи': '2024-03-31' },
+  ];
+};
 
-export default function ReportList() {
-  const [reports, setReports] = useLocalStorage('user_reports_v4', INITIAL_REPORTS);
-  const [editingId, setEditingId] = useState(null);
+export default function ReportList({ reports = [], onCreate, onDelete }) {
+  const { user, isAdmin, logout } = useAuth();
 
-  const [activeReport, setActiveReport] = useState(null);
+  const [selectedReport, setSelectedReport] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
 
-  const [title, setTitle] = useState('');
-  const [moduleId, setModuleId] = useState('clients');
-  const [selectedFields, setSelectedFields] = useState(['fullName', 'email']);
-  const [filterField, setFilterField] = useState('status');
-  const [filterOperator, setFilterOperator] = useState('equals');
+  // Состояния формы конструктора
+  const [reportTitle, setReportTitle] = useState('');
+  const [entityName, setEntityName] = useState('Продажи и Сделки');
+  const [selectedColumns, setSelectedColumns] = useState(['Сумма продажи', 'Статус сделки', 'Дата продажи']);
+  
+  const [filterColumn, setFilterColumn] = useState('Статус сделки');
+  const [filterOperator, setFilterOperator] = useState('Равно (=)');
   const [filterValue, setFilterValue] = useState('');
 
-  const currentModule = AVAILABLE_MODULES.find((m) => m.id === moduleId);
+  const [groupBy, setGroupBy] = useState('Без группировки');
+  const [aggregateFunc, setAggregateFunc] = useState('Без агрегации (вывести записи)');
 
-  const generateReportData = (report) => {
-    if (!report) return [];
-    const rawData = MOCK_DATABASE[report.moduleId] || [];
+  const [sortBy, setSortBy] = useState('Дата продажи');
+  const [sortOrder, setSortOrder] = useState('По убыванию (DESC)');
 
-    return rawData.filter((item) => {
-      if (!report.filterValue) return true;
-      const fieldValue = String(item[report.filterField] || '').toLowerCase();
-      const targetValue = report.filterValue.toLowerCase();
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-      switch (report.filterOperator) {
-        case 'equals':
-          return fieldValue === targetValue;
-        case 'contains':
-          return fieldValue.includes(targetValue);
-        case 'greater':
-          return Number(item[report.filterField]) > Number(targetValue);
-        case 'less':
-          return Number(item[report.filterField]) < Number(targetValue);
-        default:
-          return true;
-      }
-    });
+  const handleEntityChange = (e) => {
+    const newEntity = e.target.value;
+    setEntityName(newEntity);
+    const available = ENTITY_COLUMNS[newEntity] || [];
+    setSelectedColumns(available.slice(0, 3));
+    setFilterColumn(available[0] || '');
+    setSortBy(available[0] || '');
   };
 
-useEffect(() => {
-  if (activeReport) {
-    const resultsCount = generateReportData(activeReport).length;
-    // Название: "[Записей: 3] Отчёт по клиентам (Всего шаблонов: 2)"
-    document.title = `Записей в "${activeReport.title}": ${resultsCount}, отчётов: ${reports.length})`;
-  } else {
-    document.title = `Отчётов: ${reports.length} — Конструктор отчётов`;
-  }
-}, [reports, activeReport, generateReportData]);
-
-  const resetForm = () => {
-    setEditingId(null);
-    setTitle('');
-    setModuleId('clients');
-    setSelectedFields(['fullName', 'email']);
-    setFilterField('status');
-    setFilterOperator('equals');
-    setFilterValue('');
-  };
-
-  const handleModuleChange = (newModuleId) => {
-    setModuleId(newModuleId);
-    const newMod = AVAILABLE_MODULES.find((m) => m.id === newModuleId);
-    setSelectedFields([newMod.fields[0].id]);
-    setFilterField(newMod.fields[0].id);
-  };
-
-  const handleFieldToggle = (fieldId) => {
-    setSelectedFields((prev) =>
-      prev.includes(fieldId) ? prev.filter((id) => id !== fieldId) : [...prev, fieldId]
-    );
-  };
-
-  const handleStartEdit = (report) => {
-    setEditingId(report.id);
-    setTitle(report.title);
-    setModuleId(report.moduleId);
-    setSelectedFields(report.selectedFields);
-    setFilterField(report.filterField);
-    setFilterOperator(report.filterOperator);
-    setFilterValue(report.filterValue || '');
+  const handleCheckboxChange = (column) => {
+    if (selectedColumns.includes(column)) {
+      setSelectedColumns(selectedColumns.filter((c) => c !== column));
+    } else {
+      setSelectedColumns([...selectedColumns, column]);
+    }
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!title.trim() || selectedFields.length === 0) return;
+    if (!reportTitle.trim()) return;
 
-    const reportData = {
-      title: title.trim(),
-      moduleId,
-      selectedFields,
-      filterField,
-      filterOperator,
-      filterValue: filterValue.trim()
+    const newReport = {
+      title: reportTitle,
+      entityName,
+      selectedFields: selectedColumns,
+      filters: { 
+        column: filterColumn, 
+        operator: filterOperator, 
+        value: filterValue,
+        groupBy,
+        aggregateFunc,
+        sortBy,
+        sortOrder
+      },
+      description: `Создан пользователем ${user?.email || ''}`,
+      userId: user?.id
     };
 
-    if (editingId) {
-      setReports((prev) => prev.map((r) => (r.id === editingId ? { ...r, ...reportData } : r)));
-    } else {
-      setReports((prev) => [{ id: Date.now(), ...reportData }, ...prev]);
+    if (typeof onCreate === 'function') {
+      onCreate(newReport);
     }
 
-    resetForm();
+    setReportTitle('');
+    setFilterValue('');
   };
 
-  const handleDelete = (id) => {
-    setReports((prev) => prev.filter((r) => r.id !== id));
-    if (editingId === id) resetForm();
-    if (activeReport?.id === id) setActiveReport(null);
-  };
+  const filteredReports = reports.filter((report) => {
+    const query = debouncedSearchQuery.toLowerCase().trim();
+    if (!query) return true;
+    return (
+      (report.title || '').toLowerCase().includes(query) ||
+      (report.entityName || '').toLowerCase().includes(query)
+    );
+  });
+
+  const availableColumns = ENTITY_COLUMNS[entityName] || [];
 
   return (
-    <div style={{ maxWidth: '950px', margin: '0 auto', padding: '20px', fontFamily: 'sans-serif' }}>
-      <h2>📊 Конструктор пользовательских отчётов</h2>
+    <div style={{ maxWidth: '900px', margin: '20px auto', fontFamily: 'Arial, sans-serif', color: '#333' }}>
+      
+      {/* Панель пользователя */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', padding: '10px 15px', backgroundColor: '#f8f9fa', borderRadius: '6px', border: '1px solid #e9ecef' }}>
+        <div>
+          Вы вошли как: <b>{user?.email}</b> ({isAdmin ? '👑 Администратор' : '👤 Пользователь'})
+        </div>
+        <button onClick={logout} style={{ padding: '6px 12px', cursor: 'pointer', background: '#6c757d', color: '#fff', border: 'none', borderRadius: '4px' }}>
+          Выйти
+        </button>
+      </div>
 
-      <form onSubmit={handleSubmit} style={{ background: '#f8f9fa', padding: '20px', borderRadius: '8px', marginBottom: '25px', border: '1px solid #e9ecef' }}>
-        <h3>{editingId ? '✏️ Редактирование шаблона' : 'Создать новый шаблон отчёта'}</h3>
+      <h2 style={{ textAlign: 'center', marginBottom: '20px' }}>
+        📊 Конструктор отчётов по продажам и клиентам
+      </h2>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-          <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '5px' }}>Название отчёта:</label>
-            <input
-              type="text"
-              placeholder="Например: Выборка крупных заказов"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
-              required
-            />
-          </div>
+      {/* --- ФОРМА КОНСТРУКТОРА --- */}
+      <form onSubmit={handleSubmit} style={{ background: '#fff', border: '1px solid #e0e0e0', padding: '24px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', marginBottom: '30px' }}>
+        <h3 style={{ textAlign: 'center', color: '#6c63ff', marginTop: 0, marginBottom: '20px' }}>
+          Настроить новый отчёт
+        </h3>
 
-          <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '5px' }}>Раздел данных:</label>
-            <select value={moduleId} onChange={(e) => handleModuleChange(e.target.value)} style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}>
-              {AVAILABLE_MODULES.map((m) => (
-                <option key={m.id} value={m.id}>{m.label}</option>
-              ))}
-            </select>
-          </div>
+        <div style={{ marginBottom: '18px', textAlign: 'center' }}>
+          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px', color: '#555' }}>
+            Название отчёта:
+          </label>
+          <input
+            type="text"
+            placeholder="Например: Выручка по городам клиентов за месяц"
+            value={reportTitle}
+            onChange={(e) => setReportTitle(e.target.value)}
+            style={{ width: '100%', padding: '10px', border: '1px solid #ccc', borderRadius: '4px', boxSizing: 'border-box' }}
+            required
+          />
         </div>
 
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '8px' }}>Колонки для выборки:</label>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', background: '#fff', padding: '10px', borderRadius: '4px', border: '1px solid #ccc' }}>
-            {currentModule.fields.map((field) => (
-              <label key={field.id} style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', fontSize: '14px' }}>
-                <input type="checkbox" checked={selectedFields.includes(field.id)} onChange={() => handleFieldToggle(field.id)} />
-                {field.label}
+        <div style={{ marginBottom: '18px', textAlign: 'center' }}>
+          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px', color: '#555' }}>
+            Объект анализа (Сущность):
+          </label>
+          <select
+            value={entityName}
+            onChange={handleEntityChange}
+            style={{ width: '100%', padding: '10px', border: '1px solid #ccc', borderRadius: '4px', boxSizing: 'border-box', backgroundColor: '#fff' }}
+          >
+            {Object.keys(ENTITY_COLUMNS).map((entity) => (
+              <option key={entity} value={entity}>{entity}</option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ marginBottom: '20px', textAlign: 'center' }}>
+          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '10px', color: '#555' }}>
+            Колонки в отчёте:
+          </label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '15px' }}>
+            {availableColumns.map((col) => (
+              <label key={col} style={{ cursor: 'pointer', fontSize: '14px' }}>
+                <input
+                  type="checkbox"
+                  checked={selectedColumns.includes(col)}
+                  onChange={() => handleCheckboxChange(col)}
+                  style={{ marginRight: '6px' }}
+                />
+                {col}
               </label>
             ))}
           </div>
         </div>
 
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '5px' }}>Условие фильтрации:</label>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-            <select value={filterField} onChange={(e) => setFilterField(e.target.value)} style={{ padding: '8px' }}>
-              {currentModule.fields.map((f) => (
-                <option key={f.id} value={f.id}>{f.label}</option>
-              ))}
+        <hr style={{ border: 'none', borderTop: '1px dashed #e0e0e0', margin: '20px 0' }} />
+
+        {/* Фильтр */}
+        <div style={{ marginBottom: '18px' }}>
+          <div style={{ fontWeight: 'bold', textAlign: 'center', marginBottom: '10px', color: '#555' }}>
+            🎯 Фильтр (WHERE):
+          </div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <select value={filterColumn} onChange={(e) => setFilterColumn(e.target.value)} style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}>
+              {availableColumns.map((col) => <option key={col} value={col}>{col}</option>)}
             </select>
-            <select value={filterOperator} onChange={(e) => setFilterOperator(e.target.value)} style={{ padding: '8px' }}>
-              <option value="equals">Равно</option>
-              <option value="contains">Содержит</option>
-              <option value="greater">Больше чем</option>
-              <option value="less">Меньше чем</option>
+            <select value={filterOperator} onChange={(e) => setFilterOperator(e.target.value)} style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}>
+              <option value="Равно (=)">Равно (=)</option>
+              <option value="Не равно (!=)">Не равно (!=)</option>
+              <option value="Больше (>)">Больше (&gt;)</option>
+              <option value="Меньше (<)">Меньше (&lt;)</option>
+              <option value="Содержит">Содержит</option>
             </select>
-            <input type="text" placeholder="Значение..." value={filterValue} onChange={(e) => setFilterValue(e.target.value)} style={{ padding: '8px' }} />
+            <input
+              type="text"
+              placeholder="Значение..."
+              value={filterValue}
+              onChange={(e) => setFilterValue(e.target.value)}
+              style={{ flex: 2, padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+            />
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button type="submit" style={{ padding: '8px 16px', backgroundColor: editingId ? '#1890ff' : '#28a745', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-            {editingId ? 'Сохранить изменения' : 'Сохранить шаблон'}
-          </button>
-          {editingId && (
-            <button type="button" onClick={resetForm} style={{ padding: '8px 16px', border: '1px solid #ccc', borderRadius: '4px', cursor: 'pointer' }}>
-              Отмена
-            </button>
-          )}
+        {/* Агрегация и Группировка */}
+        <div style={{ backgroundColor: '#f0f4f8', padding: '15px', borderRadius: '6px', marginBottom: '18px' }}>
+          <div style={{ fontWeight: 'bold', textAlign: 'center', marginBottom: '10px', color: '#555' }}>
+            📊 Агрегация и Группировка (GROUP BY):
+          </div>
+          <div style={{ display: 'flex', gap: '15px' }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px', textAlign: 'center' }}>Группировать по:</label>
+              <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}>
+                <option value="Без группировки">Без группировки</option>
+                {availableColumns.map((col) => <option key={col} value={col}>{col}</option>)}
+              </select>
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px', textAlign: 'center' }}>Вычислить:</label>
+              <select value={aggregateFunc} onChange={(e) => setAggregateFunc(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}>
+                <option value="Без агрегации (вывести записи)">Без агрегации (вывести записи)</option>
+                <option value="SUM (Сумма)">SUM (Сумма)</option>
+                <option value="AVG (Среднее)">AVG (Среднее)</option>
+                <option value="COUNT (Количество)">COUNT (Количество)</option>
+              </select>
+            </div>
+          </div>
         </div>
+
+        {/* Сортировка */}
+        <div style={{ marginBottom: '24px' }}>
+          <div style={{ fontWeight: 'bold', textAlign: 'center', marginBottom: '10px', color: '#555' }}>
+            ⇅ Сортировка (ORDER BY):
+          </div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}>
+              {availableColumns.map((col) => <option key={col} value={col}>{col}</option>)}
+            </select>
+            <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}>
+              <option value="По возрастанию (ASC)">По возрастанию (ASC)</option>
+              <option value="По убыванию (DESC)">По убыванию (DESC)</option>
+            </select>
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          style={{
+            width: '100%',
+            padding: '12px',
+            backgroundColor: '#28a745',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '6px',
+            fontSize: '16px',
+            fontWeight: 'bold',
+            cursor: 'pointer'
+          }}
+        >
+          Сформировать и сохранить отчёт
+        </button>
       </form>
 
-      <h3>Сохранённые шаблоны отчётов</h3>
-      <ul style={{ listStyle: 'none', padding: 0 }}>
-        {reports.map((report) => {
-          const mod = AVAILABLE_MODULES.find((m) => m.id === report.moduleId);
-          return (
-            <li key={report.id} style={{ border: '1px solid #ddd', padding: '12px 16px', borderRadius: '6px', marginBottom: '10px', backgroundColor: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      {/* --- СПИСОК ОТЧЕТОВ --- */}
+      <h3>Сохранённые отчёты ({isAdmin ? 'Все пользователи' : 'Мои отчёты'})</h3>
+      
+      <input
+        type="text"
+        placeholder="Поиск по названию или сущности..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        style={{ width: '100%', padding: '10px', marginBottom: '16px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+      />
+
+      {filteredReports.length === 0 ? (
+        <p style={{ color: '#777' }}>Отчёты не найдены.</p>
+      ) : (
+        <div style={{ display: 'grid', gap: '12px' }}>
+          {filteredReports.map((report) => (
+            <div key={report.id} style={{ border: '1px solid #e0e0e0', borderRadius: '6px', padding: '16px', background: '#fafafa', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h4 style={{ margin: '0 0 6px 0' }}>{report.title}</h4>
-                <div style={{ fontSize: '13px', color: '#555' }}>Раздел: <b>{mod?.label}</b></div>
+                <h4 style={{ margin: '0 0 6px 0', color: '#333' }}>{report.title}</h4>
+                <div style={{ fontSize: '13px', color: '#666' }}>
+                  <b>Объект:</b> {report.entityName} | <b>Автор:</b> {report.User?.email || report.userId}
+                </div>
               </div>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button onClick={() => setActiveReport(report)} style={{ backgroundColor: '#52c41a', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>
-                  Просмотреть
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={() => setSelectedReport(report)}
+                  style={{ backgroundColor: '#007bff', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  👁 Открыть отчёт
                 </button>
-                <button onClick={() => handleStartEdit(report)} style={{ backgroundColor: '#1890ff', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>
-                  Изменить
-                </button>
-                <button onClick={() => handleDelete(report.id)} style={{ backgroundColor: '#dc3545', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}>
-                  Удалить
-                </button>
+
+                {isAdmin && (
+                  <button
+                    onClick={() => onDelete(report.id)}
+                    style={{ backgroundColor: '#dc3545', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}
+                  >
+                    🗑 Удалить
+                  </button>
+                )}
               </div>
-            </li>
-          );
-        })}
-      </ul>
-
-      {activeReport && (
-        <div style={{ marginTop: '30px', padding: '20px', background: '#e6f7ff', borderRadius: '8px', border: '1px solid #91d5ff' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-            <h3 style={{ margin: 0 }}>📋 Результат отчёта: "{activeReport.title}"</h3>
-            <button onClick={() => setActiveReport(null)} style={{ background: 'transparent', border: 'none', fontSize: '16px', cursor: 'pointer' }}>❌ Закрыть</button>
-          </div>
-
-          {(() => {
-            const reportData = generateReportData(activeReport);
-            const mod = AVAILABLE_MODULES.find((m) => m.id === activeReport.moduleId);
-
-            if (reportData.length === 0) {
-              return <p style={{ color: '#888' }}>По заданным условиям данные не найдены.</p>;
-            }
-
-            return (
-              <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', borderRadius: '4px', overflow: 'hidden' }}>
-                <thead>
-                  <tr style={{ background: '#fafafa', borderBottom: '2px solid #f0f0f0' }}>
-                    {activeReport.selectedFields.map((fId) => {
-                      const fieldInfo = mod?.fields.find((f) => f.id === fId);
-                      return <th key={fId} style={{ padding: '10px', textAlign: 'left', border: '1px solid #f0f0f0' }}>{fieldInfo?.label || fId}</th>;
-                    })}
-                  </tr>
-                </thead>
-                <tbody>
-                  {reportData.map((row) => (
-                    <tr key={row.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                      {activeReport.selectedFields.map((fId) => (
-                        <td key={fId} style={{ padding: '10px', border: '1px solid #f0f0f0' }}>{row[fId]}</td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            );
-          })()}
+            </div>
+          ))}
         </div>
       )}
+
+      {/* --- МОДАЛЬНОЕ ОКНО: ТАБЛИЦА С ДАННЫМИ ОТЧЁТА --- */}
+      {selectedReport && (() => {
+        // Получаем тестовые данные для вывода в таблице
+        const rawData = generateMockData(selectedReport.entityName);
+        const displayFields = Array.isArray(selectedReport.selectedFields) && selectedReport.selectedFields.length > 0
+          ? selectedReport.selectedFields
+          : (ENTITY_COLUMNS[selectedReport.entityName] || []);
+
+        return (
+          <div
+            onClick={() => setSelectedReport(null)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: 1000
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: '#fff',
+                padding: '24px',
+                borderRadius: '8px',
+                maxWidth: '800px',
+                width: '90%',
+                maxHeight: '85vh',
+                overflowY: 'auto',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                <h3 style={{ margin: 0, color: '#2c3e50' }}>{selectedReport.title}</h3>
+                <span style={{ fontSize: '12px', background: '#e9ecef', padding: '4px 8px', borderRadius: '4px' }}>
+                  {selectedReport.entityName}
+                </span>
+              </div>
+
+              {/* Блок с параметрами фильтрации */}
+              {selectedReport.filters && (
+                <div style={{ backgroundColor: '#f8f9fa', padding: '10px 14px', borderRadius: '6px', marginBottom: '15px', fontSize: '12px', color: '#555' }}>
+                  <b>Применённые фильтры:</b>{' '}
+                  {selectedReport.filters.column && selectedReport.filters.value ? (
+                    <span>{selectedReport.filters.column} {selectedReport.filters.operator} "{selectedReport.filters.value}" | </span>
+                  ) : null}
+                  <span>Группировка: {selectedReport.filters.groupBy || 'Нет'} | </span>
+                  <span>Сортировка: {selectedReport.filters.sortBy || 'Нет'} ({selectedReport.filters.sortOrder || ''})</span>
+                </div>
+              )}
+
+              {/* ТАБЛИЦА С ДАННЫМИ */}
+              <div style={{ overflowX: 'auto', border: '1px solid #dee2e6', borderRadius: '6px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#6c63ff', color: '#fff' }}>
+                      {displayFields.map((field) => (
+                        <th key={field} style={{ padding: '10px 12px', borderBottom: '2px solid #dee2e6' }}>
+                          {field}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rawData.map((row, idx) => (
+                      <tr key={idx} style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8f9fa' }}>
+                        {displayFields.map((field) => (
+                          <td key={field} style={{ padding: '10px 12px', borderBottom: '1px solid #dee2e6' }}>
+                            {row[field] !== undefined ? row[field] : '—'}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px' }}>
+                <span style={{ fontSize: '12px', color: '#777' }}>Всего записей: {rawData.length}</span>
+                <button
+                  onClick={() => setSelectedReport(null)}
+                  style={{
+                    padding: '8px 18px',
+                    backgroundColor: '#6c757d',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  Закрыть
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
     </div>
   );
 }
