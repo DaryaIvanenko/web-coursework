@@ -278,7 +278,6 @@ export default function ReportList({ reports = [], onCreate, onDelete }) {
         </button>
       </form>
 
-      {/* --- СПИСОК ОТЧЕТОВ --- */}
       <h3>Сохранённые отчёты ({isAdmin ? 'Все пользователи' : 'Мои отчёты'})</h3>
       
       <input
