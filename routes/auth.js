@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { User } = require('../models');
+const { JWT_SECRET } = require('../config/jwt');
 
 router.post('/register', async (req, res) => {
   try {
@@ -18,11 +19,7 @@ router.post('/register', async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const user = await User.create({
-      email,
-      passwordHash,
-      role: role || 'user'
-    });
+    const user = await User.create({ email, passwordHash, role: 'user' });
 
     res.status(201).json({
       message: 'Пользователь успешно зарегистрирован',
@@ -48,7 +45,7 @@ router.post('/login', async (req, res) => {
 
     // Определяем, в какаом поле хранятся данные пароля
     const passwordInDb = user.passwordHash || user.password;
-    console.log('👤 Пользователь найден. Пароль/хэш в БД:', passwordInDb);
+    console.log('👤 Пользователь найден');
 
     if (!passwordInDb) {
       console.log('❌ В БД у пользователя отсутствует пароль/хэш!');
@@ -71,12 +68,12 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Неверный email или пароль' });
     }
 
-    // Генерируем JWT токен
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET || 'super_secret_key_12345',
+      JWT_SECRET,
       { expiresIn: '1h' }
     );
+        
 
     console.log('✅ Вход успешен!');
 

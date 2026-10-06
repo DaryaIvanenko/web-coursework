@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
+import api from '../api';
 
 const ENTITY_COLUMNS = {
   'Продажи и Сделки': ['ID сделки', 'Сумма продажи', 'Количество товаров', 'Скидка (%)', 'Статус сделки', 'Дата продажи'],
   'Клиенты': ['ID клиента', 'Имя', 'Email', 'Город', 'Дата регистрации'],
   'Товары': ['ID товара', 'Название товара', 'Категория', 'Цена', 'Остаток на складе']
 };
+
 const mapColumnToKey = (columnName) => {
   const map = {
-    // Сделки (Deals)
     'ID сделки': 'id',
     'Сумма продажи': 'amount',
     'Количество товаров': 'quantity',
@@ -16,14 +17,12 @@ const mapColumnToKey = (columnName) => {
     'Статус сделки': 'status',
     'Дата продажи': 'dealDate',
     
-    // Товары (Products)
     'ID товара': 'id',
     'Название товара': 'title',
     'Категория': 'category',
     'Цена': 'price',
     'Остаток на складе': 'stock',
 
-    // Клиенты (Clients)
     'ID клиента': 'id',
     'Имя': 'name',
     'Email': 'email',
@@ -32,18 +31,15 @@ const mapColumnToKey = (columnName) => {
   };
   return map[columnName] || columnName;
 };
+
 export default function ReportList({ reports = [], onCreate, onDelete }) {
   const { user, isAdmin, logout } = useAuth();
-
-const [isModalOpen, setIsModalOpen] = useState(false);
-
 
   const [selectedReport, setSelectedReport] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [reportData, setReportData] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Состояния формы конструктора
   const [reportTitle, setReportTitle] = useState('');
   const [entityName, setEntityName] = useState('Продажи и Сделки');
   const [selectedColumns, setSelectedColumns] = useState(['Сумма продажи', 'Статус сделки', 'Дата продажи']);
@@ -62,10 +58,8 @@ const [isModalOpen, setIsModalOpen] = useState(false);
     if (!entity) return;
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:3000/reports/data?entity=${encodeURIComponent(entity)}`);
-      if (!response.ok) throw new Error('Ошибка сети');
-      const data = await response.json();
-      setReportData(data);
+      const { data } = await api.get('/reports/data', { params: { entity } });
+      setReportData(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Не удалось загрузить данные:', error);
       setReportData([]);
@@ -74,35 +68,29 @@ const [isModalOpen, setIsModalOpen] = useState(false);
     }
   }, []);
 
-const handleOpenReport = async (report) => {
-  setLoading(true);
-  setSelectedReport(report);
+  const handleOpenReport = async (report) => {
+    setLoading(true);
+    setSelectedReport(report);
 
-  const entityString = typeof report === 'object' ? report.entityName : report;
+    const entityString = typeof report === 'object' ? report.entityName : report;
 
-  try {
-    const response = await fetch(`http://localhost:3000/reports/data?entity=${encodeURIComponent(entityString)}`);
-    
-    if (!response.ok) {
-      throw new Error(`Ошибка HTTP: ${response.status}`);
+    try {
+      // api.js сам добавляет заголовок Authorization: Bearer <token>
+      const { data } = await api.get('/reports/data', { params: { entity: entityString } });
+      setReportData(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Ошибка загрузки отчета:', error);
+      setReportData([]);
+    } finally {
+      setLoading(false);
     }
-    
-    const data = await response.json();
-    console.log('📊 Данные с сервера:', data);
-    
-    setReportData(data);
-  } catch (error) {
-    console.error('Ошибка загрузки отчета:', error);
-    setReportData([]);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
-const handleCloseModal = () => {
-  setSelectedReport(null);
-  setReportData([]);
-};
+  const handleCloseModal = () => {
+    setSelectedReport(null);
+    setReportData([]);
+  };
+
   // Заголовок страницы
   useEffect(() => {
     document.title = `Отчётов: ${reports.length} — Конструктор отчётов`;
@@ -125,35 +113,43 @@ const handleCloseModal = () => {
     }
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!reportTitle.trim()) return;
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+  if (!reportTitle.trim()) return;
 
-    const newReport = {
-      title: reportTitle,
-      entityName,
-      selectedFields: selectedColumns,
-      filters: { 
-        column: filterColumn, 
-        operator: filterOperator, 
-        value: filterValue,
-        groupBy,
-        aggregateFunc,
-        sortBy,
-        sortOrder
-      },
-      description: `Создан пользователем ${user?.email || ''}`,
-      userId: user?.id
-    };
-
-    if (typeof onCreate === 'function') {
-      onCreate(newReport);
-    }
-
-    setReportTitle('');
-    setFilterValue('');
+  const newReport = {
+    title: reportTitle,
+    entityName,
+    selectedFields: selectedColumns,
+    filters: { 
+      column: filterColumn, 
+      operator: filterOperator, 
+      value: filterValue,
+      groupBy,
+      aggregateFunc,
+      sortBy,
+      sortOrder
+    },
+    description: `Создан пользователем ${user?.email || ''}`
   };
 
+  try {
+    if (typeof onCreate === 'function') {
+      await onCreate(newReport); // Вызываем функцию из App.jsx
+    }
+    setReportTitle('');
+    setFilterValue('');
+    alert('Отчёт успешно сохранён!');
+  } catch (error) {
+    console.error('Ошибка сохранения отчета:', error);
+    alert('Не удалось сохранить отчёт');
+  }
+};
+const handleDeleteReport = (reportId) => {
+  if (!window.confirm('Вы уверены, что хотите удалить этот отчет?')) return;
+  // Сам DELETE-запрос (с оптимистичным обновлением и откатом) выполняет App.jsx
+  if (typeof onDelete === 'function') onDelete(reportId);
+};
   const filteredReports = reports.filter((report) => {
     const query = searchQuery.toLowerCase().trim();
     if (!query) return true;
@@ -164,13 +160,14 @@ const handleCloseModal = () => {
   });
 
   const availableColumns = ENTITY_COLUMNS[entityName] || [];
+  const isAdmin2 = user?.role?.toLowerCase() === 'admin' || isAdmin;
 
   return (
     <div style={{ maxWidth: '900px', margin: '20px auto', fontFamily: 'Arial, sans-serif', color: '#333' }}>
       
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', padding: '10px 15px', backgroundColor: '#f8f9fa', borderRadius: '6px', border: '1px solid #e9ecef' }}>
         <div>
-          Вы вошли как: <b>{user?.email}</b> ({isAdmin ? '👑 Администратор' : '👤 Пользователь'})
+          Вы вошли как: <strong>{isAdmin2 ? 'Администратор' : 'Пользователь'}</strong>
         </div>
         <button onClick={logout} style={{ padding: '6px 12px', cursor: 'pointer', background: '#6c757d', color: '#fff', border: 'none', borderRadius: '4px' }}>
           Выйти
@@ -319,7 +316,7 @@ const handleCloseModal = () => {
         </button>
       </form>
 
-      <h3>Сохранённые отчёты ({isAdmin ? 'Все пользователи' : 'Мои отчёты'})</h3>
+      <h3>Сохранённые отчёты ({isAdmin2 ? 'Все пользователи' : 'Мои отчёты'})</h3>
       
       <input
         type="text"
@@ -350,9 +347,9 @@ const handleCloseModal = () => {
                   👁 Открыть отчёт
                 </button>
 
-                {isAdmin && (
+                {isAdmin2 && (
                   <button
-                    onClick={() => onDelete(report.id)}
+                    onClick={() => handleDeleteReport(report.id)}
                     style={{ backgroundColor: '#dc3545', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}
                   >
                     🗑 Удалить
@@ -365,102 +362,103 @@ const handleCloseModal = () => {
       )}
 
       {selectedReport && (
-  <div 
-    className="modal-overlay" 
-    onClick={() => setSelectedReport(null)}
-    style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      width: '100vw',
-      height: '100vh',
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 9999
-    }}
-  >
-    <div 
-      className="modal-content" 
-      onClick={(e) => e.stopPropagation()}
-      style={{
-        backgroundColor: '#fff',
-        padding: '24px',
-        borderRadius: '12px',
-        maxWidth: '800px',
-        width: '90%',
-        maxHeight: '80vh',
-        overflowY: 'auto'
-      }}
-    >
-      <h3>{selectedReport.title || 'Просмотр отчёта'}</h3>
-
-      {loading ? (
-        <p style={{ textAlign: 'center', padding: '20px' }}>⏳ Загрузка данных из БД...</p>
-      ) : (
-        <div style={{ overflowX: 'auto', marginBottom: '16px' }}>
-          {(() => {
-            // Безопасно высчитываем поля
-            const fields = Array.isArray(selectedReport.selectedFields) && selectedReport.selectedFields.length > 0
-              ? selectedReport.selectedFields
-              : (ENTITY_COLUMNS[selectedReport.entityName] || ENTITY_COLUMNS[selectedReport.entity] || []);
-
-            return (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#6c63ff', color: '#fff' }}>
-                    {fields.map((field) => (
-                      <th key={field} style={{ padding: '10px' }}>{field}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {reportData.length === 0 ? (
-                    <tr>
-                      <td colSpan={fields.length || 1} style={{ textAlign: 'center', padding: '15px' }}>
-                        Записи не найдены
-                      </td>
-                    </tr>
-                  ) : (
-                    reportData.map((row, idx) => (
-                      <tr key={idx} style={{ backgroundColor: idx % 2 === 0 ? '#fff' : '#f8f9fa' }}>
-                        {fields.map((field) => (
-                          <td key={field} style={{ padding: '10px' }}>
-                            {row[mapColumnToKey(field)] !== undefined 
-                              ? String(row[mapColumnToKey(field)]) 
-                              : '—'}
-                          </td>
-                        ))}
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            );
-          })()}
-        </div>
-      )}
-
-      <div style={{ textAlign: 'right' }}>
-        <button
-          onClick={() => setSelectedReport(null)}
+        <div 
+          className="modal-overlay" 
+          onClick={handleCloseModal}
           style={{
-            padding: '8px 18px',
-            backgroundColor: '#6c757d',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontWeight: 'bold'
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999
           }}
         >
-          Закрыть
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+          <div 
+            className="modal-content" 
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#fff',
+              padding: '24px',
+              borderRadius: '12px',
+              maxWidth: '800px',
+              width: '90%',
+              maxHeight: '80vh',
+              overflowY: 'auto'
+            }}
+          >
+            <h3>{selectedReport.title || 'Просмотр отчёта'}</h3>
+
+            {loading ? (
+              <p style={{ textAlign: 'center', padding: '20px' }}>⏳ Загрузка данных из БД...</p>
+            ) : (
+              <div style={{ overflowX: 'auto', marginBottom: '16px' }}>
+                {(() => {
+                  const fields = Array.isArray(selectedReport.selectedFields) && selectedReport.selectedFields.length > 0
+                    ? selectedReport.selectedFields
+                    : (ENTITY_COLUMNS[selectedReport.entityName] || ENTITY_COLUMNS[selectedReport.entity] || []);
+
+                  return (
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ backgroundColor: '#6c63ff', color: '#fff' }}>
+                          {fields.map((field) => (
+                            <th key={field} style={{ padding: '10px' }}>{field}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reportData.length === 0 ? (
+                          <tr>
+                            <td colSpan={fields.length || 1} style={{ textAlign: 'center', padding: '15px' }}>
+                              Записи не найдены
+                            </td>
+                          </tr>
+                        ) : (
+                          reportData.map((row, idx) => (
+                            <tr key={idx} style={{ backgroundColor: idx % 2 === 0 ? '#fff' : '#f8f9fa' }}>
+                              {fields.map((field) => (
+                                <td key={field} style={{ padding: '10px' }}>
+                                  {(() => {
+                                    // сервер может вернуть ключи как на русском ('Имя'), так и как в модели ('name')
+                                    const value = row[field] ?? row[mapColumnToKey(field)];
+                                    return value !== undefined && value !== null ? String(value) : '—';
+                                  })()}
+                                </td>
+                              ))}
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  );
+                })()}
+              </div>
+            )}
+
+            <div style={{ textAlign: 'right' }}>
+              <button
+                onClick={handleCloseModal}
+                style={{
+                  padding: '8px 18px',
+                  backgroundColor: '#6c757d',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                Закрыть
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

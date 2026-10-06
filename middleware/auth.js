@@ -1,28 +1,25 @@
 const jwt = require('jsonwebtoken');
+const { JWT_SECRET } = require('../config/jwt');
 
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+const authenticateToken = (req, res, next) => {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token) return res.status(401).json({ message: 'Токен не передан' });
 
-  if (!token) {
-    return res.status(401).json({ message: 'Токен отсутствует' });
-  }
-
-  jwt.verify(token, process.env.JWT_SECRET || 'super_secret_key_12345', (err, user) => {
-    if (err) {
-      return res.status(403).json({ message: 'Недействительный токен' });
-    }
-    req.user = user;
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
     next();
-  });
-}
+  } catch (err) {
+    console.error('❌ [AUTH CHECK] Ошибка JWT:', err.message);
+    return res.status(401).json({ message: 'Недействительный токен' });
+  }
+};
 
 const isAdmin = (req, res, next) => {
-  if (req.user && req.user.role === 'admin') {
-    next();
-  } else {
-    return res.status(403).json({ message: 'Доступ запрещен: требуется роль администратора' });
+  if (req.user?.role?.toLowerCase() !== 'admin') {
+    return res.status(403).json({ message: 'Доступ запрещён' });
   }
+  next();
 };
 
 module.exports = { authenticateToken, isAdmin };
