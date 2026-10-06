@@ -6,42 +6,42 @@ const ENTITY_COLUMNS = {
   'Клиенты': ['ID клиента', 'Имя', 'Email', 'Город', 'Дата регистрации'],
   'Товары': ['ID товара', 'Название товара', 'Категория', 'Цена', 'Остаток на складе']
 };
+const mapColumnToKey = (columnName) => {
+  const map = {
+    // Сделки (Deals)
+    'ID сделки': 'id',
+    'Сумма продажи': 'amount',
+    'Количество товаров': 'quantity',
+    'Скидка (%)': 'discount',
+    'Статус сделки': 'status',
+    'Дата продажи': 'dealDate',
+    
+    // Товары (Products)
+    'ID товара': 'id',
+    'Название товара': 'title',
+    'Категория': 'category',
+    'Цена': 'price',
+    'Остаток на складе': 'stock',
 
-// Функция-генератор тестовых данных для вывода в таблице отчёта
-const generateMockData = (entityName) => {
-  if (entityName === 'Клиенты') {
-    return [
-      { 'ID клиента': 101, 'Имя': 'Иван Иванов', 'Email': 'ivan@example.com', 'Город': 'Москва', 'Дата регистрации': '2024-01-15' },
-      { 'ID клиента': 102, 'Имя': 'Анна Смирнова', 'Email': 'anna@example.com', 'Город': 'Санкт-Петербург', 'Дата регистрации': '2024-02-10' },
-      { 'ID клиента': 103, 'Имя': 'Пётр Петров', 'Email': 'petr@example.com', 'Город': 'Казань', 'Дата регистрации': '2024-03-05' },
-      { 'ID клиента': 104, 'Имя': 'Ольга Сидорова', 'Email': 'olga@example.com', 'Город': 'Москва', 'Дата регистрации': '2024-03-12' },
-    ];
-  }
-  if (entityName === 'Товары') {
-    return [
-      { 'ID товара': 'P-01', 'Название товара': 'Ноутбук Pro 15', 'Категория': 'Электроника', 'Цена': 85000, 'Остаток на складе': 12 },
-      { 'ID товара': 'P-02', 'Название товара': 'Смартфон X', 'Категория': 'Электроника', 'Цена': 45000, 'Остаток на складе': 25 },
-      { 'ID товара': 'P-03', 'Название товара': 'Беспроводные наушники', 'Категория': 'Аксессуары', 'Цена': 7500, 'Остаток на складе': 50 },
-      { 'ID товара': 'P-04', 'Название товара': 'Механическая клавиатура', 'Категория': 'Аксессуары', 'Цена': 6200, 'Остаток на складе': 18 },
-    ];
-  }
-  // По умолчанию: 'Продажи и Сделки'
-  return [
-    { 'ID сделки': 'TRX-1001', 'Сумма продажи': 12500, 'Количество товаров': 2, 'Скидка (%)': 5, 'Статус сделки': 'Оплачено', 'Дата продажи': '2024-03-28' },
-    { 'ID сделки': 'TRX-1002', 'Сумма продажи': 45000, 'Количество товаров': 1, 'Скидка (%)': 0, 'Статус сделки': 'Оплачено', 'Дата продажи': '2024-03-29' },
-    { 'ID сделки': 'TRX-1003', 'Сумма продажи': 7800, 'Количество товаров': 3, 'Скидка (%)': 10, 'Статус сделки': 'В обработке', 'Дата продажи': '2024-03-30' },
-    { 'ID сделки': 'TRX-1004', 'Сумма продажи': 21000, 'Количество товаров': 2, 'Скидка (%)': 0, 'Статус сделки': 'Отменено', 'Дата продажи': '2024-03-31' },
-  ];
+    // Клиенты (Clients)
+    'ID клиента': 'id',
+    'Имя': 'name',
+    'Email': 'email',
+    'Город': 'city',
+    'Дата регистрации': 'createdAt'
+  };
+  return map[columnName] || columnName;
 };
-
 export default function ReportList({ reports = [], onCreate, onDelete }) {
   const { user, isAdmin, logout } = useAuth();
 
+const [isModalOpen, setIsModalOpen] = useState(false);
+
+
   const [selectedReport, setSelectedReport] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
-
-   const [activeReport, setActiveReport] = useState(null);
+  const [reportData, setReportData] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   // Состояния формы конструктора
   const [reportTitle, setReportTitle] = useState('');
@@ -58,46 +58,58 @@ export default function ReportList({ reports = [], onCreate, onDelete }) {
   const [sortBy, setSortBy] = useState('Дата продажи');
   const [sortOrder, setSortOrder] = useState('По убыванию (DESC)');
 
-    const generateReportData = useCallback((report) => {
-    if (!report) return [];
-    const rawData = MOCK_DATABASE?.[report?.moduleId] || [];
-
-    return rawData.filter((item) => {
-      if (!report.filterValue) return true;
-      const fieldValue = String(item[report.filterField], '').toLowerCase();
-      const targetValue = report.filterValue.toLowerCase();
-
-      switch (report.filterOperator) {
-        case 'equals':
-          return fieldValue === targetValue;
-        case 'contains':
-          return fieldValue.includes(targetValue);
-        case 'greater':
-          return Number(item[report.filterField]) > Number(targetValue);
-        case 'less':
-          return Number(item[report.filterField]) < Number(targetValue);
-        default:
-          return true;
-      }
-    });
+  // Загрузка данных отчета
+  const fetchReportData = useCallback(async (entity) => {
+    if (!entity) return;
+    setLoading(true);
+    try {
+      const response = await fetch(`http://localhost:3000/reports/data?entity=${encodeURIComponent(entity)}`);
+      if (!response.ok) throw new Error('Ошибка сети');
+      const data = await response.json();
+      setReportData(data);
+    } catch (error) {
+      console.error('Не удалось загрузить данные:', error);
+      setReportData([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-    useEffect(() => {
-    if (activeReport) {
-      const resultsCount = generateReportData(activeReport).length;
-      document.title = `Записей в "${activeReport.title}": ${resultsCount}, отчётов: ${reports.length}`;
-    } else {
-      document.title = `Отчётов: ${reports.length} — Конструктор отчётов`;
+const handleOpenReport = async (report) => {
+  setLoading(true);
+  setSelectedReport(report); // 👈 КЛЮЧЕВОЙ МОМЕНТ: записываем объект отчёта, чтобы сработало {selectedReport && ...}
+
+  // Забираем строку сущности (например, "Клиенты") из переданного отчёта:
+  const entityString = typeof report === 'object' ? report.entityName : report;
+
+  try {
+    const response = await fetch(`http://localhost:3000/reports/data?entity=${encodeURIComponent(entityString)}`);
+    
+    if (!response.ok) {
+      throw new Error(`Ошибка HTTP: ${response.status}`);
     }
-  }, [reports, activeReport, generateReportData]);
+    
+    const data = await response.json();
+    console.log('📊 Данные с сервера:', data);
+    
+    setReportData(data);
+  } catch (error) {
+    console.error('Ошибка загрузки отчета:', error);
+    setReportData([]);
+  } finally {
+    setLoading(false);
+  }
+};
 
-
+// 2. Функция закрытия модального окна:
+const handleCloseModal = () => {
+  setSelectedReport(null);
+  setReportData([]);
+};
+  // Заголовок страницы
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
+    document.title = `Отчётов: ${reports.length} — Конструктор отчётов`;
+  }, [reports]);
 
   const handleEntityChange = (e) => {
     const newEntity = e.target.value;
@@ -146,7 +158,7 @@ export default function ReportList({ reports = [], onCreate, onDelete }) {
   };
 
   const filteredReports = reports.filter((report) => {
-    const query = debouncedSearchQuery.toLowerCase().trim();
+    const query = searchQuery.toLowerCase().trim();
     if (!query) return true;
     return (
       (report.title || '').toLowerCase().includes(query) ||
@@ -339,7 +351,7 @@ export default function ReportList({ reports = [], onCreate, onDelete }) {
 
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
-                  onClick={() => setSelectedReport(report)}
+                  onClick={() => handleOpenReport(report)}
                   style={{ backgroundColor: '#007bff', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}
                 >
                   👁 Открыть отчёт
@@ -360,108 +372,103 @@ export default function ReportList({ reports = [], onCreate, onDelete }) {
       )}
 
       {/* --- МОДАЛЬНОЕ ОКНО: ТАБЛИЦА С ДАННЫМИ ОТЧЁТА --- */}
-      {selectedReport && (() => {
-        // Получаем тестовые данные для вывода в таблице
-        const rawData = generateMockData(selectedReport.entityName);
-        const displayFields = Array.isArray(selectedReport.selectedFields) && selectedReport.selectedFields.length > 0
-          ? selectedReport.selectedFields
-          : (ENTITY_COLUMNS[selectedReport.entityName] || []);
+      {selectedReport && (
+  <div 
+    className="modal-overlay" 
+    onClick={() => setSelectedReport(null)}
+    style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      width: '100vw',
+      height: '100vh',
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 9999
+    }}
+  >
+    <div 
+      className="modal-content" 
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        backgroundColor: '#fff',
+        padding: '24px',
+        borderRadius: '12px',
+        maxWidth: '800px',
+        width: '90%',
+        maxHeight: '80vh',
+        overflowY: 'auto'
+      }}
+    >
+      <h3>{selectedReport.title || 'Просмотр отчёта'}</h3>
 
-        return (
-          <div
-            onClick={() => setSelectedReport(null)}
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              zIndex: 1000
-            }}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                background: '#fff',
-                padding: '24px',
-                borderRadius: '8px',
-                maxWidth: '800px',
-                width: '90%',
-                maxHeight: '85vh',
-                overflowY: 'auto',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                <h3 style={{ margin: 0, color: '#2c3e50' }}>{selectedReport.title}</h3>
-                <span style={{ fontSize: '12px', background: '#e9ecef', padding: '4px 8px', borderRadius: '4px' }}>
-                  {selectedReport.entityName}
-                </span>
-              </div>
+      {loading ? (
+        <p style={{ textAlign: 'center', padding: '20px' }}>⏳ Загрузка данных из БД...</p>
+      ) : (
+        <div style={{ overflowX: 'auto', marginBottom: '16px' }}>
+          {(() => {
+            // Безопасно высчитываем поля
+            const fields = Array.isArray(selectedReport.selectedFields) && selectedReport.selectedFields.length > 0
+              ? selectedReport.selectedFields
+              : (ENTITY_COLUMNS[selectedReport.entityName] || ENTITY_COLUMNS[selectedReport.entity] || []);
 
-              {/* Блок с параметрами фильтрации */}
-              {selectedReport.filters && (
-                <div style={{ backgroundColor: '#f8f9fa', padding: '10px 14px', borderRadius: '6px', marginBottom: '15px', fontSize: '12px', color: '#555' }}>
-                  <b>Применённые фильтры:</b>{' '}
-                  {selectedReport.filters.column && selectedReport.filters.value ? (
-                    <span>{selectedReport.filters.column} {selectedReport.filters.operator} "{selectedReport.filters.value}" | </span>
-                  ) : null}
-                  <span>Группировка: {selectedReport.filters.groupBy || 'Нет'} | </span>
-                  <span>Сортировка: {selectedReport.filters.sortBy || 'Нет'} ({selectedReport.filters.sortOrder || ''})</span>
-                </div>
-              )}
-
-              {/* ТАБЛИЦА С ДАННЫМИ */}
-              <div style={{ overflowX: 'auto', border: '1px solid #dee2e6', borderRadius: '6px' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
-                  <thead>
-                    <tr style={{ backgroundColor: '#6c63ff', color: '#fff' }}>
-                      {displayFields.map((field) => (
-                        <th key={field} style={{ padding: '10px 12px', borderBottom: '2px solid #dee2e6' }}>
-                          {field}
-                        </th>
-                      ))}
+            return (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#6c63ff', color: '#fff' }}>
+                    {fields.map((field) => (
+                      <th key={field} style={{ padding: '10px' }}>{field}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportData.length === 0 ? (
+                    <tr>
+                      <td colSpan={fields.length || 1} style={{ textAlign: 'center', padding: '15px' }}>
+                        Записи не найдены
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {rawData.map((row, idx) => (
-                      <tr key={idx} style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8f9fa' }}>
-                        {displayFields.map((field) => (
-                          <td key={field} style={{ padding: '10px 12px', borderBottom: '1px solid #dee2e6' }}>
-                            {row[field] !== undefined ? row[field] : '—'}
+                  ) : (
+                    reportData.map((row, idx) => (
+                      <tr key={idx} style={{ backgroundColor: idx % 2 === 0 ? '#fff' : '#f8f9fa' }}>
+                        {fields.map((field) => (
+                          <td key={field} style={{ padding: '10px' }}>
+                            {row[mapColumnToKey(field)] !== undefined 
+                              ? String(row[mapColumnToKey(field)]) 
+                              : '—'}
                           </td>
                         ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            );
+          })()}
+        </div>
+      )}
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px' }}>
-                <span style={{ fontSize: '12px', color: '#777' }}>Всего записей: {rawData.length}</span>
-                <button
-                  onClick={() => setSelectedReport(null)}
-                  style={{
-                    padding: '8px 18px',
-                    backgroundColor: '#6c757d',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold'
-                  }}
-                >
-                  Закрыть
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      <div style={{ textAlign: 'right' }}>
+        <button
+          onClick={() => setSelectedReport(null)}
+          style={{
+            padding: '8px 18px',
+            backgroundColor: '#6c757d',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 'bold'
+          }}
+        >
+          Закрыть
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
     </div>
   );
