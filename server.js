@@ -2,7 +2,11 @@ const express = require('express');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.set('view engine', 'ejs');
+app.set('views', './views');
+
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 let reports = [
   {
@@ -23,83 +27,77 @@ let reports = [
   }
 ];
 
-app.get('/reports', (req, res) => {
-  res.json(reports);
+app.use((req, res, next) => {
+  const time = new Date().toISOString();
+  console.log(`[${time}] ${req.method} ${req.url}`);
+  next();
 });
 
-app.get('/reports/:id', (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const report = reports.find(r => r.id === id);
-
-  if (!report) {
-    return res.status(404).json({ error: `Отчёт с ID ${id} не найден` });
+app.use((req, res, next) => {
+  if (req.query.auth === '1') {
+    req.user = { name: 'Администратор' };
+  } else {
+    req.user = { name: 'Гость' };
   }
-
-  res.json(report);
+  res.locals.user = req.user;
+  next();
 });
 
-app.post('/reports', (req, res) => {
-  const { title, entityName, selectedFields, filters } = req.body;
+app.get('/', (req, res) => {
+  res.render('index', {
+    title: 'Главная страница',
+    reports: reports
+  });
+});
 
-  if (!title || !entityName || !Array.isArray(selectedFields)) {
-    return res.status(400).json({
-      error: 'Неверные данные. Поля title, entityName и массив selectedFields обязательны.'
-    });
-  }
+app.get('/add', (req, res) => {
+  res.render('add', { title: 'Добавить отчет' });
+});
+
+app.post('/add', (req, res) => {
+  const { title, entityName, selectedFields } = req.body;
+
+  const parsedFields = typeof selectedFields === 'string'
+    ? selectedFields.split(',').map(f => f.trim())
+    : [];
 
   const newReport = {
     id: reports.length > 0 ? Math.max(...reports.map(r => r.id)) + 1 : 1,
-    title,
-    entityName,
-    selectedFields,
-    filters: filters || [],
+    title: title || 'Новый отчет',
+    entityName: entityName || 'deals',
+    selectedFields: parsedFields,
+    filters: [],
     createdAt: new Date().toISOString()
   };
 
   reports.push(newReport);
-  res.status(201).json(newReport);
+  res.redirect('/');
 });
 
-app.put('/reports/:id', (req, res) => {
+app.get('/report/:id', (req, res, next) => {
   const id = parseInt(req.params.id, 10);
-  const index = reports.findIndex(r => r.id === id);
+  const report = reports.find(r => r.id === id);
 
-  if (index === -1) {
-    return res.status(404).json({ error: `Отчёт с ID ${id} не найден` });
+  if (!report) {
+    return next();
   }
 
-  const { title, entityName, selectedFields, filters } = req.body;
-
-  if (!title || !entityName || !Array.isArray(selectedFields)) {
-    return res.status(400).json({ error: 'Некорректная структура объекта для обновления' });
-  }
-
-  reports[index] = {
-    ...reports[index],
-    title,
-    entityName,
-    selectedFields,
-    filters: filters || []
-  };
-
-  res.json(reports[index]);
+  res.render('report', {
+    title: report.title,
+    report: report
+  });
 });
 
-app.delete('/reports/:id', (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const index = reports.findIndex(r => r.id === id);
-
-  if (index === -1) {
-    return res.status(404).json({ error: `Отчёт с ID ${id} не найден` });
-  }
-
-  reports.splice(index, 1);
-  res.status(204).send();
+app.use((req, res, next) => {
+  res.status(404).render('404', { title: '404 - Страница не найдена' });
 });
 
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  console.error('[СЕРВЕРНАЯ ОШИБКА]:', err.stack);
+  res.status(500).render('500', {
+    title: '500 - Ошибка сервера',
+    error: err.message || 'Внутренняя ошибка сервера'
+  });
 });
 
 app.listen(PORT, () => {

@@ -1,0 +1,18 @@
+<%- include('partials/header') %>
+
+<h1>Список отчетов</h1>
+
+<% if (reports.length === 0) { %>
+  <p>Список отчетов пуст.</p>
+<% } else { %>
+  <ul>
+    <% reports.forEach(report => { %>
+      <li>
+        <a href="/item/<%= report.id %>"><strong><%= report.title %></strong></a>
+        (Сущность: <%= report.entityName %>)
+      </li>
+    <% }); %>
+  </ul>
+<% } %>
+
+<%- include('partials/footer') %>

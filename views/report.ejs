@@ -1,0 +1,21 @@
+<%- include('partials/header') %>
+
+<h1>Отчет: <%= report.title %></h1>
+<p><strong>ID:</strong> <%= report.id %></p>
+<p><strong>Сущность:</strong> <%= report.entityName %></p>
+<p><strong>Выбранные поля:</strong> <%= report.selectedFields.join(', ') %></p>
+
+<h3>Фильтры:</h3>
+<% if (report.filters && report.filters.length > 0) { %>
+  <ul>
+    <% report.filters.forEach(f => { %>
+      <li>Поле: <%= f.field %> | Оператор: <%= f.operator %> | Значение: <%= f.value %></li>
+    <% }); %>
+  </ul>
+<% } else { %>
+  <p>Без фильтров</p>
+<% } %>
+
+<a href="/">← Назад к списку</a>
+
+<%- include('partials/footer') %>

@@ -1,0 +1,27 @@
+<%- include('partials/header') %>
+
+<h1>Добавить новый отчет</h1>
+
+<form action="/add" method="POST">
+  <div>
+    <label>Название отчета:</label><br>
+    <input type="text" name="title" required>
+  </div>
+  <div>
+    <label>Сущность:</label><br>
+    <select name="entityName">
+      <option value="deals">deals (Сделки)</option>
+      <option value="clients">clients (Клиенты)</option>
+      <option value="orders">orders (Заказы)</option>
+      <option value="sales">sales (Продажи)</option>
+    </select>
+  </div>
+  <div>
+    <label>Поля (через запятую):</label><br>
+    <input type="text" name="selectedFields" placeholder="id, amount, status" required>
+  </div>
+  <br>
+  <button type="submit">Сохранить</button>
+</form>
+
+<%- include('partials/footer') %>
