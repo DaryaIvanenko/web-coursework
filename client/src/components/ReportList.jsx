@@ -137,7 +137,6 @@ export default function ReportList({ reports = [], onCreate, onDelete }) {
     }
     setReportTitle('');
     setFilterValue('');
-    alert('Отчёт успешно сохранён!');
   } catch (error) {
     console.error('Ошибка сохранения отчета:', error);
     alert('Не удалось сохранить отчёт');
@@ -186,6 +185,7 @@ const handleDeleteReport = (reportId) => {
           </label>
           <input
             type="text"
+            maxLength={20}
             placeholder="Например: Выручка по городам клиентов за месяц"
             value={reportTitle}
             onChange={(e) => setReportTitle(e.target.value)}
