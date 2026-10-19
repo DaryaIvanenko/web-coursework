@@ -1,6 +1,6 @@
 <%- include('partials/header') %>
 <h1>Ошибка 500</h1>
 <p>Внутренняя ошибка сервера.</p>
-<p><i><%= error %></i></p>
+<p><strong>Что произошло:</strong> <i><%= locals.error || 'Причина не определена' %></i></p>
 <a href="/">На главную</a>
 <%- include('partials/footer') %>

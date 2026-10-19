@@ -2,11 +2,14 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title><%= title %></title>
+  <title><%= locals.title || 'Конструктор отчетов' %></title>
 </head>
 <body>
   <nav>
-    <a href="/">Главная</a> | <a href="/add">Добавить отчет</a>
+    <a href="/">Главная</a> |
+    <a href="/add">Добавить отчет</a> |
+    <a href="/logs">Журнал запросов</a> |
+    <a href="/error-test">Проверить страницу 500</a>
   </nav>
-  <p>Пользователь: <%= user ? user.name : 'Гость' %></p>
+  <p>Пользователь: <%= locals.user ? locals.user.name : 'Гость' %></p>
   <hr>
