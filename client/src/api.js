@@ -12,12 +12,10 @@ api.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
-}, (error) => {
-  return Promise.reject(error);
-});
+}, (error) => Promise.reject(error));
 
 api.interceptors.response.use(
-  (res) => res,
+  (response) => response,
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
@@ -28,11 +26,11 @@ api.interceptors.response.use(
   }
 );
 
-export const fetchReports = (entityName, signal) => {
-  const params = entityName ? { entityName } : {};
+export const fetchReports = ({ search } = {}, signal) => {
+  const params = {};
+  if (search) params.search = search;
   return api.get('/reports', { params, signal });
 };
-
 
 export const createReport = (data) => api.post('/reports', data);
 export const updateReport = (id, data) => api.put(`/reports/${id}`, data);

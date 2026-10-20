@@ -11,28 +11,33 @@ const errText = (e) =>
 function MainContent() {
   const { user } = useAuth();
   const [reports, setReports] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [searching, setSearching] = useState(false);
   const [error, setError] = useState('');
 
   const loadReports = useCallback(async (signal) => {
-    setLoading(true);
+    setSearching(true);
     setError('');
     try {
-      const { data } = await fetchReports(undefined, signal);
+      const { data } = await fetchReports({ search: searchTerm }, signal);
       setReports(Array.isArray(data) ? data : []);
     } catch (e) {
       if (axios.isCancel(e)) return;
       setError(errText(e));
     } finally {
-      if (!signal?.aborted) setLoading(false);
+      if (!signal?.aborted) {
+        setSearching(false);
+        setInitialLoading(false);
+      }
     }
-  }, []);
+  }, [searchTerm]);
 
   useEffect(() => {
     if (!user) return;
     const controller = new AbortController();
     loadReports(controller.signal);
-    return () => controller.abort(); // отмена при размонтировании
+    return () => controller.abort();
   }, [user, loadReports]);
 
   const handleCreateReport = async (newData) => {
@@ -43,11 +48,10 @@ function MainContent() {
       setReports((prev) => prev.map((r) => (r.id === tempId ? data : r)));
     } catch (e) {
       setReports((prev) => prev.filter((r) => r.id !== tempId));
-      alert('Не удалось создать отчёт: ' + errText(e));
+      throw new Error(errText(e));
     }
   };
 
-  // UPDATE: оптимистично, откат при ошибке
   const handleUpdateReport = async (id, changes) => {
     const backup = reports;
     setReports((prev) => prev.map((r) => (r.id === id ? { ...r, ...changes } : r)));
@@ -60,7 +64,6 @@ function MainContent() {
     }
   };
 
-  // DELETE: оптимистично, возврат при ошибке
   const handleDeleteReport = async (id) => {
     const backup = reports;
     setReports((prev) => prev.filter((r) => r.id !== id));
@@ -73,22 +76,27 @@ function MainContent() {
   };
 
   if (!user) return <LoginForm />;
-  if (loading) return <p style={{ textAlign: 'center', marginTop: 50 }}>Загрузка...</p>;
-  if (error)
-    return (
-      <div style={{ textAlign: 'center', marginTop: 50 }}>
-        <p style={{ color: 'red' }}>Ошибка: {error}</p>
-        <button onClick={() => loadReports()}>Повторить</button>
-      </div>
-    );
+  if (initialLoading) {
+    return <p style={{ textAlign: 'center', marginTop: 50 }}>Загрузка...</p>;
+  }
 
   return (
-    <ReportList
-      reports={reports}
-      onCreate={handleCreateReport}
-      onUpdate={handleUpdateReport}
-      onDelete={handleDeleteReport}
-    />
+    <>
+      {error && (
+        <div style={{ maxWidth: 900, margin: '20px auto 0', padding: 12, textAlign: 'center', background: '#fdecea', border: '1px solid #f5c2c0', borderRadius: 6 }}>
+          <p style={{ color: '#b00020', margin: '0 0 8px' }}>Ошибка: {error}</p>
+          <button onClick={() => loadReports()}>Повторить</button>
+        </div>
+      )}
+      <ReportList
+        reports={reports}
+        searching={searching}
+        onSearch={setSearchTerm}
+        onCreate={handleCreateReport}
+        onUpdate={handleUpdateReport}
+        onDelete={handleDeleteReport}
+      />
+    </>
   );
 }
 

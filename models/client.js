@@ -1,26 +1,14 @@
-'use strict';
-const {
-  Model
-} = require('sequelize');
-module.exports = (sequelize, DataTypes) => {
-  class Client extends Model {
-    /**
-     * Helper method for defining associations.
-     * This method is not a part of Sequelize lifecycle.
-     * The `models/index` file will call this method automatically.
-     */
-    static associate(models) {
-      // define association here
-    }
-  }
-  Client.init({
-    name: DataTypes.STRING,
-    email: DataTypes.STRING,
-    city: DataTypes.STRING,
-    registrationDate: DataTypes.DATE
-  }, {
-    sequelize,
-    modelName: 'Client',
-  });
-  return Client;
-};
+const mongoose = require('mongoose');
+const { toJSON } = require('./_options');
+
+const clientSchema = new mongoose.Schema(
+  {
+    name: String,
+    email: String,
+    city: String,
+    registrationDate: Date,
+  },
+  { timestamps: true, toJSON }
+);
+
+module.exports = mongoose.model('Client', clientSchema);

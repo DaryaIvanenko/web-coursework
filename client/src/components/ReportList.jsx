@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../api';
+import { useDebounce } from '../hooks/useDebounce';
 
 const ENTITY_COLUMNS = {
   'Продажи и Сделки': ['ID сделки', 'Сумма продажи', 'Количество товаров', 'Скидка (%)', 'Статус сделки', 'Дата продажи'],
@@ -16,7 +17,7 @@ const mapColumnToKey = (columnName) => {
     'Скидка (%)': 'discount',
     'Статус сделки': 'status',
     'Дата продажи': 'dealDate',
-    
+
     'ID товара': 'id',
     'Название товара': 'title',
     'Категория': 'category',
@@ -32,7 +33,9 @@ const mapColumnToKey = (columnName) => {
   return map[columnName] || columnName;
 };
 
-export default function ReportList({ reports = [], onCreate, onDelete }) {
+const authorOf = (r) => r.User?.email || r.userId?.email || r.userId;
+
+export default function ReportList({ reports = [], searching = false, onSearch, onCreate, onUpdate, onDelete }) {
   const { user, isAdmin, logout } = useAuth();
 
   const [selectedReport, setSelectedReport] = useState(null);
@@ -40,10 +43,15 @@ export default function ReportList({ reports = [], onCreate, onDelete }) {
   const [reportData, setReportData] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  const debouncedQuery = useDebounce(searchQuery, 500);
+  useEffect(() => {
+    if (typeof onSearch === 'function') onSearch(debouncedQuery.trim());
+  }, [debouncedQuery, onSearch]);
+
   const [reportTitle, setReportTitle] = useState('');
   const [entityName, setEntityName] = useState('Продажи и Сделки');
   const [selectedColumns, setSelectedColumns] = useState(['Сумма продажи', 'Статус сделки', 'Дата продажи']);
-  
+
   const [filterColumn, setFilterColumn] = useState('Статус сделки');
   const [filterOperator, setFilterOperator] = useState('Равно (=)');
   const [filterValue, setFilterValue] = useState('');
@@ -53,20 +61,6 @@ export default function ReportList({ reports = [], onCreate, onDelete }) {
 
   const [sortBy, setSortBy] = useState('Дата продажи');
   const [sortOrder, setSortOrder] = useState('По убыванию (DESC)');
-
-  const fetchReportData = useCallback(async (entity) => {
-    if (!entity) return;
-    setLoading(true);
-    try {
-      const { data } = await api.get('/reports/data', { params: { entity } });
-      setReportData(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error('Не удалось загрузить данные:', error);
-      setReportData([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
   const handleOpenReport = async (report) => {
     setLoading(true);
@@ -119,9 +113,9 @@ export default function ReportList({ reports = [], onCreate, onDelete }) {
     title: reportTitle,
     entityName,
     selectedFields: selectedColumns,
-    filters: { 
-      column: filterColumn, 
-      operator: filterOperator, 
+    filters: {
+      column: filterColumn,
+      operator: filterOperator,
       value: filterValue,
       groupBy,
       aggregateFunc,
@@ -137,30 +131,32 @@ export default function ReportList({ reports = [], onCreate, onDelete }) {
     }
     setReportTitle('');
     setFilterValue('');
+    alert('Отчёт успешно сохранён!');
   } catch (error) {
     console.error('Ошибка сохранения отчета:', error);
-    alert('Не удалось сохранить отчёт');
+    alert('Не удалось сохранить отчёт: ' + error.message);
   }
 };
+const handleEditReport = (report) => {
+  const title = window.prompt('Новое название отчёта:', report.title);
+  if (title === null) return;
+  const trimmed = title.trim();
+  if (!trimmed || trimmed === report.title) return;
+  if (typeof onUpdate === 'function') onUpdate(report.id, { title: trimmed });
+};
+
 const handleDeleteReport = (reportId) => {
   if (!window.confirm('Вы уверены, что хотите удалить этот отчет?')) return;
   if (typeof onDelete === 'function') onDelete(reportId);
 };
-  const filteredReports = reports.filter((report) => {
-    const query = searchQuery.toLowerCase().trim();
-    if (!query) return true;
-    return (
-      (report.title || '').toLowerCase().includes(query) ||
-      (report.entityName || '').toLowerCase().includes(query)
-    );
-  });
+  const filteredReports = reports;
 
   const availableColumns = ENTITY_COLUMNS[entityName] || [];
   const isAdmin2 = user?.role?.toLowerCase() === 'admin' || isAdmin;
 
   return (
     <div style={{ maxWidth: '900px', margin: '20px auto', fontFamily: 'Arial, sans-serif', color: '#333' }}>
-      
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', padding: '10px 15px', backgroundColor: '#f8f9fa', borderRadius: '6px', border: '1px solid #e9ecef' }}>
         <div>
           Вы вошли как: <strong>{isAdmin2 ? 'Администратор' : 'Пользователь'}</strong>
@@ -185,7 +181,6 @@ const handleDeleteReport = (reportId) => {
           </label>
           <input
             type="text"
-            maxLength={20}
             placeholder="Например: Выручка по городам клиентов за месяц"
             value={reportTitle}
             onChange={(e) => setReportTitle(e.target.value)}
@@ -230,7 +225,6 @@ const handleDeleteReport = (reportId) => {
 
         <hr style={{ border: 'none', borderTop: '1px dashed #e0e0e0', margin: '20px 0' }} />
 
-        {/* Фильтр */}
         <div style={{ marginBottom: '18px' }}>
           <div style={{ fontWeight: 'bold', textAlign: 'center', marginBottom: '10px', color: '#555' }}>
             🎯 Фильтр (WHERE):
@@ -314,14 +308,17 @@ const handleDeleteReport = (reportId) => {
       </form>
 
       <h3>Сохранённые отчёты ({isAdmin2 ? 'Все пользователи' : 'Мои отчёты'})</h3>
-      
+
       <input
         type="text"
         placeholder="Поиск по названию или сущности..."
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
-        style={{ width: '100%', padding: '10px', marginBottom: '16px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+        style={{ width: '100%', padding: '10px', marginBottom: '6px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
       />
+      <div style={{ minHeight: '20px', marginBottom: '10px', fontSize: '13px', color: '#777' }}>
+        {searching ? '⏳ Поиск...' : ''}
+      </div>
 
       {filteredReports.length === 0 ? (
         <p style={{ color: '#777' }}>Отчёты не найдены.</p>
@@ -332,7 +329,7 @@ const handleDeleteReport = (reportId) => {
               <div>
                 <h4 style={{ margin: '0 0 6px 0', color: '#333' }}>{report.title}</h4>
                 <div style={{ fontSize: '13px', color: '#666' }}>
-                  <b>Объект:</b> {report.entityName} | <b>Автор:</b> {report.User?.email || report.userId}
+                  <b>Объект:</b> {report.entityName} | <b>Автор:</b> {authorOf(report)}
                 </div>
               </div>
 
@@ -344,9 +341,18 @@ const handleDeleteReport = (reportId) => {
                   👁 Открыть отчёт
                 </button>
 
+                <button
+                  onClick={() => handleEditReport(report)}
+                  disabled={String(report.id).startsWith('tmp-')}
+                  style={{ backgroundColor: '#ffc107', color: '#333', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  ✏️ Изменить
+                </button>
+
                 {isAdmin2 && (
                   <button
                     onClick={() => handleDeleteReport(report.id)}
+                    disabled={String(report.id).startsWith('tmp-')}
                     style={{ backgroundColor: '#dc3545', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}
                   >
                     🗑 Удалить
@@ -359,8 +365,8 @@ const handleDeleteReport = (reportId) => {
       )}
 
       {selectedReport && (
-        <div 
-          className="modal-overlay" 
+        <div
+          className="modal-overlay"
           onClick={handleCloseModal}
           style={{
             position: 'fixed',
@@ -375,8 +381,8 @@ const handleDeleteReport = (reportId) => {
             zIndex: 9999
           }}
         >
-          <div 
-            className="modal-content" 
+          <div
+            className="modal-content"
             onClick={(e) => e.stopPropagation()}
             style={{
               backgroundColor: '#fff',
@@ -421,7 +427,6 @@ const handleDeleteReport = (reportId) => {
                               {fields.map((field) => (
                                 <td key={field} style={{ padding: '10px' }}>
                                   {(() => {
-                                    // сервер может вернуть ключи как на русском ('Имя'), так и как в модели ('name')
                                     const value = row[field] ?? row[mapColumnToKey(field)];
                                     return value !== undefined && value !== null ? String(value) : '—';
                                   })()}
