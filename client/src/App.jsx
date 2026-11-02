@@ -3,16 +3,24 @@ import axios from 'axios';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginForm from './components/LoginForm';
 import ReportList from './components/ReportList';
+import ChatPanel from './components/ChatPanel';
+import Toasts from './components/Toasts';
+import { useSocket } from './hooks/useSocket';
 import { fetchReports, createReport, updateReport, deleteReport } from './api';
 
 const errText = (e) =>
   e.response?.data?.error || e.response?.data?.message || e.message || 'Ошибка сети';
 
+const GENERAL_CHAT = { open: true, room: 'general', title: 'Общий чат' };
+
 function MainContent() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
+  const { socket, connected, online, toasts } = useSocket(user ? token : null);
+
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [chat, setChat] = useState({ ...GENERAL_CHAT, open: false });
 
   const loadReports = useCallback(async (signal) => {
     setLoading(true);
@@ -32,7 +40,7 @@ function MainContent() {
     if (!user) return;
     const controller = new AbortController();
     loadReports(controller.signal);
-    return () => controller.abort(); // отмена при размонтировании
+    return () => controller.abort();
   }, [user, loadReports]);
 
   const handleCreateReport = async (newData) => {
@@ -47,7 +55,6 @@ function MainContent() {
     }
   };
 
-  // UPDATE: оптимистично, откат при ошибке
   const handleUpdateReport = async (id, changes) => {
     const backup = reports;
     setReports((prev) => prev.map((r) => (r.id === id ? { ...r, ...changes } : r)));
@@ -60,7 +67,6 @@ function MainContent() {
     }
   };
 
-  // DELETE: оптимистично, возврат при ошибке
   const handleDeleteReport = async (id) => {
     const backup = reports;
     setReports((prev) => prev.filter((r) => r.id !== id));
@@ -70,6 +76,10 @@ function MainContent() {
       setReports(backup);
       alert('Не удалось удалить отчёт: ' + errText(e));
     }
+  };
+
+  const handleOpenChat = (report) => {
+    setChat({ open: true, room: `report:${report.id}`, title: `Обсуждение: ${report.title}` });
   };
 
   if (!user) return <LoginForm />;
@@ -83,12 +93,26 @@ function MainContent() {
     );
 
   return (
-    <ReportList
-      reports={reports}
-      onCreate={handleCreateReport}
-      onUpdate={handleUpdateReport}
-      onDelete={handleDeleteReport}
-    />
+    <>
+      <ReportList
+        reports={reports}
+        onCreate={handleCreateReport}
+        onUpdate={handleUpdateReport}
+        onDelete={handleDeleteReport}
+        onOpenChat={handleOpenChat}
+      />
+      <ChatPanel
+        socket={socket}
+        connected={connected}
+        user={user}
+        online={online}
+        chat={chat}
+        onOpen={() => setChat((c) => ({ ...c, open: true }))}
+        onClose={() => setChat((c) => ({ ...c, open: false }))}
+        onGeneral={() => setChat(GENERAL_CHAT)}
+      />
+      <Toasts items={toasts} />
+    </>
   );
 }
 

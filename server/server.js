@@ -1,9 +1,13 @@
+const http = require('http');
 const express = require('express');
 const cors = require('cors');
 const { User } = require('../models');
 const { authenticateToken } = require('../middleware/auth');
+const { initSocket } = require('../socket');
 
 const app = express();
+const server = http.createServer(app);
+initSocket(server);
 
 app.use(cors());
 app.use(express.json());
@@ -30,7 +34,6 @@ app.get('/users', authenticateToken, async (req, res) => {
   }
 });
 
-
 app.use((req, res) => {
   res.status(404).json({ message: `Маршрут ${req.method} ${req.originalUrl} не найден` });
 });
@@ -41,6 +44,6 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Сервер запущен на http://localhost:${PORT}`);
 });

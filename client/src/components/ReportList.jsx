@@ -32,7 +32,7 @@ const mapColumnToKey = (columnName) => {
   return map[columnName] || columnName;
 };
 
-export default function ReportList({ reports = [], onCreate, onDelete }) {
+export default function ReportList({ reports = [], onCreate, onDelete, onOpenChat }) {
   const { user, isAdmin, logout } = useAuth();
 
   const [selectedReport, setSelectedReport] = useState(null);
@@ -342,6 +342,14 @@ const handleDeleteReport = (reportId) => {
                   style={{ backgroundColor: '#007bff', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}
                 >
                   👁 Открыть отчёт
+                </button>
+
+                <button
+                  onClick={() => onOpenChat && onOpenChat(report)}
+                  disabled={String(report.id).startsWith('tmp-')}
+                  style={{ backgroundColor: '#6c63ff', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  💬 Обсуждение
                 </button>
 
                 {isAdmin2 && (
