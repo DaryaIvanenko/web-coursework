@@ -21,7 +21,7 @@ const canJoinRoom = async (user, room) => {
 
 const initSocket = (httpServer) => {
   const origins = [
-    /^http:\/\/(localhost|127\.0\.0\.1):\d+$/,
+    /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/,
     process.env.CLIENT_URL
   ].filter(Boolean);
 
